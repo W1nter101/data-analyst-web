@@ -1,0 +1,47 @@
+---
+description: Core project context. Always apply at the start of every session.
+alwaysApply: true
+---
+
+# Project: CSV Data Analyst Web App
+
+## Mandatory startup behavior
+1. Read `AGENTS.md` at the project root first.
+2. Read the relevant feature plan in `docs/features/` if the task matches a feature.
+3. Summarize stack, architecture, and conventions before writing any code.
+4. Do not start coding if requirements are ambiguous — ask concise questions first.
+
+## Stack (quick reference)
+- Next.js 15 App Router + TypeScript strict
+- Tailwind CSS v4
+- TanStack Table v8 + PapaParse
+- Recharts + react-grid-layout
+- Vercel AI SDK + Google Gemini 2.0 Flash
+- Zustand for global state
+
+## Hard rules
+- All types live in `src/types/index.ts` — never duplicate.
+- All AI calls go through `/api/chat` — never from client.
+- All chart rendering goes through `ChartRenderer.tsx`.
+- Zustand only for shared state — no localStorage for CSV row data.
+- Server Components for shells, Client Components for interactive UI.
+- Every component must handle loading, empty, and error states.
+- Tailwind only — no inline styles except react-grid-layout dimensions.
+- Minimal diffs. Reuse existing code before creating new abstractions.
+- No broad refactors unless explicitly requested.
+
+## Output format before coding
+
+### Codebase understanding
+- Stack:
+- Relevant files:
+- Conventions to follow:
+- Risks:
+
+### Implementation plan
+- Goal:
+- Files to create/modify:
+- What stays unchanged:
+- Edge cases:
+- Manual test checklist:
+

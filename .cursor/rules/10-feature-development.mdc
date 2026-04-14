@@ -1,0 +1,29 @@
+---
+description: Use when implementing any new feature or modifying existing functionality
+globs: src/**/*.{ts,tsx}
+---
+
+# Feature Development Rule
+
+## Before every feature
+1. Read the feature plan file in `docs/features/` that matches this task.
+2. Identify all files to touch — trace data flow from source to UI.
+3. Present the implementation plan before writing code.
+4. Split large features into phases. Implement phase 1 only, then stop for review.
+
+## Safe-change checklist
+- [ ] Reusing existing components/hooks/utils?
+- [ ] Using types from `src/types/index.ts`?
+- [ ] Not touching unrelated files?
+- [ ] Handling loading, empty, and error states?
+- [ ] Responsive layout preserved?
+- [ ] No new npm dependency without prior justification?
+
+## After each step
+Report:
+- Files changed:
+- What changed and why:
+- Possible regressions:
+- Manual test checklist:
+- Next suggested step:
+
