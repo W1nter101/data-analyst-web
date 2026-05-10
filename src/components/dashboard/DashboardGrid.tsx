@@ -1,34 +1,20 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import GridLayout from 'react-grid-layout';
+import { useEffect, useMemo, useState } from 'react';
+import ReactGridLayout, { WidthProvider } from 'react-grid-layout/legacy';
+import type { Layout } from 'react-grid-layout/legacy';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
 
 import { DashboardWidget as DashboardWidgetItem } from '@/components/dashboard/DashboardWidget';
 import { useAppStore } from '@/store/appStore';
 import type { DashboardWidget } from '@/types';
 
-type GridLayoutComponent = (props: {
-  children: ReactNode;
-  className?: string;
-  layout: Array<GridPosition & { minW?: number; minH?: number }>;
-  cols: number;
-  rowHeight: number;
-  onLayoutChange: (layout: unknown) => void;
-  isDraggable?: boolean;
-  isResizable?: boolean;
-  margin?: [number, number];
-  containerPadding?: [number, number];
-  compactType?: 'vertical' | 'horizontal' | null;
-  preventCollision?: boolean;
-}) => React.JSX.Element;
-type WidthProviderLike = {
-  WidthProvider?: (component: typeof GridLayout) => unknown;
-};
-
-const widthProvider = (GridLayout as unknown as WidthProviderLike).WidthProvider;
-const ReactGridLayout: GridLayoutComponent = widthProvider
-  ? (widthProvider(GridLayout) as GridLayoutComponent)
-  : (GridLayout as unknown as GridLayoutComponent);
+/**
+ * WidthProvider HOC must be applied at module level (outside the component).
+ * Applying inside render re-creates the component on every render and breaks drag state.
+ */
+const GridLayoutWithWidth = WidthProvider(ReactGridLayout);
 
 type GridPosition = {
   i: string;
@@ -87,12 +73,12 @@ export function DashboardGrid() {
         w: mobile ? 1 : widget.layout.w,
         h: widget.layout.h,
         minW: 1,
-        minH: 3,
+        minH: 4,
       })),
     [dashboardWidgets, mobile],
   );
 
-  const handleLayoutChange = (nextLayout: unknown) => {
+  const handleLayoutChange = (nextLayout: Layout) => {
     const normalized = (Array.isArray(nextLayout) ? nextLayout : []) as GridPosition[];
     updateDashboardLayout(mapWidgetsFromLayout(dashboardWidgets, normalized, cols));
   };
@@ -106,22 +92,23 @@ export function DashboardGrid() {
   }
 
   return (
-    <ReactGridLayout
+    <GridLayoutWithWidth
       className="layout"
       layout={layout}
       cols={cols}
       rowHeight={60}
       onLayoutChange={handleLayoutChange}
-      isDraggable
-      isResizable
-      margin={[16, 16]}
-      containerPadding={[0, 0]}
+      isDraggable={true}
+      isResizable={true}
+      draggableHandle=".chart-drag-handle"
+      margin={[16, 16] as const}
+      containerPadding={[0, 0] as const}
       compactType="vertical"
       preventCollision={false}
     >
       {dashboardWidgets.map((widget) => (
         <DashboardWidgetItem key={widget.id} widget={widget} />
       ))}
-    </ReactGridLayout>
+    </GridLayoutWithWidth>
   );
 }

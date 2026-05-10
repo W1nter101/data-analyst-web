@@ -47,12 +47,17 @@ export function ChartPicker() {
   }
 
   const addDashboardWidget = (chartId: string) => {
+    // Place new widget below all existing ones to prevent overlap
+    const bottomY = dashboardWidgets.reduce(
+      (max, w) => Math.max(max, w.layout.y + w.layout.h),
+      0,
+    );
     updateDashboardLayout([
       ...dashboardWidgets,
       {
         id: uuidv4(),
         chartId,
-        layout: { x: 0, y: 0, w: 6, h: 4 },
+        layout: { x: 0, y: bottomY, w: 6, h: 6 },
       },
     ]);
   };
