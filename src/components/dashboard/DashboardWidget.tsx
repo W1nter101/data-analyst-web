@@ -3,6 +3,9 @@
 import React from 'react';
 
 import { ChartWidget } from '@/components/chart/ChartWidget';
+import { EmptySlotWidget } from '@/components/widgets/EmptySlotWidget';
+import { ImageWidget } from '@/components/widgets/ImageWidget';
+import { TextWidget } from '@/components/widgets/TextWidget';
 import type { DashboardWidget as DashboardWidgetType } from '@/types';
 
 type DashboardWidgetProps = {
@@ -21,9 +24,15 @@ export const DashboardWidget = React.forwardRef<HTMLDivElement, DashboardWidgetP
         ref={ref}
         style={style}
         className={`${className ?? ''} h-full overflow-hidden`}
+        data-widget-id={widget.id}
         {...rest}
       >
-        <ChartWidget widget={widget} />
+        {widget.widgetType === 'chart' && <ChartWidget widget={widget} />}
+        {widget.widgetType === 'text' && <TextWidget widget={widget} />}
+        {widget.widgetType === 'image' && <ImageWidget widget={widget} />}
+        {(!widget.widgetType || widget.widgetType === 'empty') && (
+          <EmptySlotWidget widgetId={widget.id} />
+        )}
         {children}
       </div>
     );

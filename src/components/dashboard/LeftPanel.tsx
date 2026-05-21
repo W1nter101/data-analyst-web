@@ -149,6 +149,48 @@ export function LeftPanel({
           return;
         }
 
+        // Handle analyze intent — hybrid pipeline
+        if (data.intent === 'analyze' && data.markdownTable) {
+          try {
+            // Step 3: Call narrative API with results
+            const narrativeRes = await fetch('/api/chat/narrative', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                markdownTable: data.markdownTable,
+                user_query: query.trim(),
+              }),
+            });
+
+            if (!narrativeRes.ok) throw new Error('Narrative API failed');
+
+            const { narrative } = await narrativeRes.json();
+
+            // Step 4: Display narrative as assistant message
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `ai-${Date.now()}`,
+                role: 'assistant',
+                content: narrative || 'Không thể tạo câu trả lời.',
+                isError: false,
+              },
+            ]);
+          } catch (err) {
+            console.error('[analyze intent]', err);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `err-${Date.now()}`,
+                role: 'assistant',
+                content: '❌ Lỗi khi phân tích dữ liệu.',
+                isError: true,
+              },
+            ]);
+          }
+          return;
+        }
+
         // Apply chart config to the dashboard
         if (data.intent === 'visualize' && data.chart_config) {
           const store = useAppStore.getState();

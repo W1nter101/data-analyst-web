@@ -21,6 +21,12 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb', // set sẵn, không ảnh hưởng performance
+    },
+  },
+  serverExternalPackages: ['better-sqlite3'],
 };
 
 export default nextConfig;

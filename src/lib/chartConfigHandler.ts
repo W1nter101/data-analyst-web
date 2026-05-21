@@ -2,14 +2,27 @@ import { v4 as uuidv4 } from 'uuid';
 
 import type { AppStoreState } from '@/store/appStore';
 import type { ChartType } from '@/types';
+import { applyAIChartConfig, type AIChartIntent } from '@/lib/applyAIChartConfig';
 
 /**
  * Shape of the AI model's chart_config output.
+ * Extended to support filters, aggregation, color_by, and title.
  */
 export interface AIChartConfig {
   type: string;   // "Line", "Bar", "Pie", "Scatter", "Area"
   x_axis: string; // column name for X axis
   y_axis: string; // column name for Y axis
+  title?: string;
+  filters?: Array<{
+    column: string;
+    operator: 'eq' | 'in' | 'gt' | 'lt' | 'gte' | 'lte' | 'contains';
+    value: string | string[] | number;
+  }>;
+  aggregation?: {
+    function: 'sum' | 'avg' | 'count' | 'min' | 'max';
+    group_by?: string;
+  };
+  color_by?: string;
 }
 
 /**
@@ -70,13 +83,11 @@ export interface ApplyResult {
 /**
  * Validate and apply an AI-generated chart config to the app store.
  *
- * 1. Applies keyword override on chart type (safety net over model output)
- * 2. Validates that x_axis and y_axis columns exist in the current CSV
- * 3. Maps model types ("Line") to app types ("line")
- * 4. Calls appStore.addChart() + appStore.updateDashboardLayout()
- * 5. Returns a success/error result for the chat UI to display
- *
- * Does NOT modify appStore.ts — uses the existing public API.
+ * Pipeline:
+ * 1. Validate x_axis / y_axis columns exist in CSV
+ * 2. Apply keyword override on chart type (safety net over model output)
+ * 3. Run applyAIChartConfig() to filter/aggregate raw data (validation)
+ * 4. Create ChartConfig and DashboardWidget via appStore API
  */
 export function applyChartConfig(
   aiConfig: AIChartConfig,
@@ -123,8 +134,28 @@ export function applyChartConfig(
     }
   }
 
+  // Run the AI chart config pipeline to validate filters work
+  const aiIntent: AIChartIntent = {
+    intent: 'visualize',
+    chart_type: chartType,
+    x_axis: aiConfig.x_axis,
+    y_axis: aiConfig.y_axis,
+    filters: aiConfig.filters,
+    aggregation: aiConfig.aggregation,
+    color_by: aiConfig.color_by,
+    title: aiConfig.title,
+  };
+  const processed = applyAIChartConfig(csv.rows, aiIntent);
+
+  if (processed.labels.length === 0) {
+    return {
+      success: false,
+      message: 'Sau khi lọc dữ liệu, không còn dòng nào phù hợp. Hãy thử lại với điều kiện khác.',
+    };
+  }
+
   const chartId = uuidv4();
-  const title = `${aiConfig.y_axis} theo ${aiConfig.x_axis}`;
+  const title = aiConfig.title ?? `${aiConfig.y_axis} theo ${aiConfig.x_axis}`;
 
   // Add chart via existing appStore API
   store.addChart({
@@ -133,23 +164,17 @@ export function applyChartConfig(
     title,
     xColumn: aiConfig.x_axis,
     yColumn: aiConfig.y_axis,
+    colorColumn: aiConfig.color_by,
+    filters: aiConfig.filters,
   });
 
   // Add dashboard widget below all existing ones
-  const currentWidgets = store.dashboardWidgets;
-  const bottomY = currentWidgets.reduce(
-    (max, w) => Math.max(max, w.layout.y + w.layout.h),
-    0,
-  );
-
-  store.updateDashboardLayout([
-    ...currentWidgets,
-    {
-      id: uuidv4(),
-      chartId,
-      layout: { x: 0, y: bottomY, w: 6, h: 6 },
-    },
-  ]);
+  store.addWidget({
+    id: uuidv4(),
+    widgetType: 'chart',
+    chartId,
+    layout: { x: 0, y: Infinity, w: 6, h: 6 },
+  });
 
   return {
     success: true,

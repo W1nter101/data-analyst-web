@@ -73,7 +73,11 @@ export function DashboardGrid() {
         w: mobile ? 1 : widget.layout.w,
         h: widget.layout.h,
         minW: 1,
-        minH: 4,
+        minH: widget.widgetType === 'empty' ? 3 : 4,
+        // Empty widgets are non-draggable and non-resizable
+        isDraggable: widget.widgetType !== 'empty',
+        isResizable: widget.widgetType !== 'empty',
+        static: false, // allow it to be pushed down
       })),
     [dashboardWidgets, mobile],
   );
@@ -82,14 +86,6 @@ export function DashboardGrid() {
     const normalized = (Array.isArray(nextLayout) ? nextLayout : []) as GridPosition[];
     updateDashboardLayout(mapWidgetsFromLayout(dashboardWidgets, normalized, cols));
   };
-
-  if (dashboardWidgets.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-black/15 bg-black/2 px-4 py-8 text-center text-sm text-foreground/70 dark:border-white/20 dark:bg-white/4">
-        No charts yet. Use the chart builder above to add one.
-      </div>
-    );
-  }
 
   return (
     <GridLayoutWithWidth

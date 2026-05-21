@@ -16,8 +16,7 @@ function isNumericColumn(schema: ColumnSchema | undefined): boolean {
 export function ChartPicker() {
   const { csv } = useCSVData();
   const addChart = useAppStore((s) => s.addChart);
-  const dashboardWidgets = useAppStore((s) => s.dashboardWidgets);
-  const updateDashboardLayout = useAppStore((s) => s.updateDashboardLayout);
+  const addWidget = useAppStore((s) => s.addWidget);
 
   const [chartType, setChartType] = useState<ChartType>('bar');
   const [xColumn, setXColumn] = useState('');
@@ -46,22 +45,6 @@ export function ChartPicker() {
     );
   }
 
-  const addDashboardWidget = (chartId: string) => {
-    // Place new widget below all existing ones to prevent overlap
-    const bottomY = dashboardWidgets.reduce(
-      (max, w) => Math.max(max, w.layout.y + w.layout.h),
-      0,
-    );
-    updateDashboardLayout([
-      ...dashboardWidgets,
-      {
-        id: uuidv4(),
-        chartId,
-        layout: { x: 0, y: bottomY, w: 6, h: 6 },
-      },
-    ]);
-  };
-
   const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canSubmit) return;
@@ -76,7 +59,13 @@ export function ChartPicker() {
       xColumn,
       yColumn,
     });
-    addDashboardWidget(id);
+
+    addWidget({
+      id: uuidv4(),
+      widgetType: 'chart',
+      chartId: id,
+      layout: { x: 0, y: Infinity, w: 6, h: 6 },
+    });
 
     setTitle('');
   };

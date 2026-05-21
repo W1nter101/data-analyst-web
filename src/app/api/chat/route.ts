@@ -3,42 +3,83 @@ import { NextRequest, NextResponse } from 'next/server';
 const LM_STUDIO_BASE_URL =
   process.env.LM_STUDIO_BASE_URL || 'http://localhost:1234/v1';
 const LM_STUDIO_MODEL =
-  process.env.LM_STUDIO_MODEL || 'phi-3-mini-4k-instruct';
+  process.env.LM_STUDIO_MODEL || 'sql-phi3';
 
-const SYSTEM_PROMPT = `Bạn là một AI phân tích dữ liệu bán hàng. Hãy dựa vào schema được cung cấp để chuyển đổi user_query thành cấu hình biểu đồ tương ứng. Chỉ trả về JSON hợp lệ, không thêm text nào khác.
+const SYSTEM_PROMPT = `You are a data analysis AI. Given schema and user_query, return valid JSON only.
 
-Nếu user_query yêu cầu vẽ biểu đồ hoặc phân tích dữ liệu, trả về:
+Schema columns will be provided in the user message. Use EXACT column names from schema.
+
+## Intent: "visualize"
+When user asks for a chart/graph:
 {
   "intent": "visualize",
   "chart_config": {
-    "type": "Line | Bar | Pie | Scatter | Area",
-    "x_axis": "<tên cột trục X>",
-    "y_axis": "<tên cột trục Y>"
+    "type": "Bar | Line | Pie | Scatter | Area",
+    "x_axis": "<exact column name from schema>",
+    "y_axis": "<exact column name from schema>",
+    "title": "<short descriptive title>",
+    "aggregation": { "function": "sum | avg | count | min | max", "group_by": "<column>" },
+    "filters": [{ "column": "<col>", "operator": "eq | in | gt | lt", "value": "<val>" }],
+    "color_by": "<column or null>"
   }
 }
 
-Nếu user_query không liên quan đến dữ liệu hoặc không thể vẽ biểu đồ, trả về:
+## Intent: "analyze"
+When user asks a question requiring calculation (ranking, comparison, summary, trend):
 {
-  "intent": "unknown",
-  "message": "Tôi chỉ có thể giúp phân tích dữ liệu CSV và tạo biểu đồ."
+  "intent": "analyze",
+  "analysis_config": {
+    "operation": "rank | compare | summary | trend",
+    "metric": "<EXACT column name from schema>",
+    "group_by": "<EXACT column name from schema>",
+    "aggregation": "sum | avg | count | min | max",
+    "limit": <number or null>,
+    "filters": [{ "column": "<col>", "operator": "in | eq | gt | lt", "value": "<val>" }]
+  }
 }
 
-Ví dụ các câu hỏi không liên quan: xin chào, thời tiết, nấu ăn, hỏi thăm, chuyện phiếm.`;
+Operation rules:
+- rank: top/bottom N → set limit = N, no filters needed
+- compare: specific groups → set filters with those group values
+- summary: totals across all data → no filters, no limit
+- trend: over time → group_by = date/time column
+
+## Intent: "unknown"
+When query is not about data:
+{ "intent": "unknown", "message": "Tôi chỉ có thể giúp phân tích dữ liệu CSV." }
+
+Return JSON only. No explanation, no markdown.`;
 
 /**
  * Attempt to extract JSON from a string that may contain markdown
  * code fences or other wrapper text around the actual JSON.
  */
-function extractJSON(raw: string): string {
-  // Try to find JSON inside ```json ... ``` or ``` ... ```
-  const fencedMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fencedMatch) return fencedMatch[1].trim();
+function extractJson(rawContent: string): unknown {
+  if (!rawContent?.trim()) return null;
 
-  // Try to find the first { ... } block
-  const braceMatch = raw.match(/\{[\s\S]*\}/);
-  if (braceMatch) return braceMatch[0].trim();
+  // Attempt 1: direct parse
+  try { return JSON.parse(rawContent.trim()); } catch { }
 
-  return raw.trim();
+  // Attempt 2: prefill trick — model omitted opening "{"
+  try { return JSON.parse("{" + rawContent); } catch { }
+
+  // Attempt 3: model echoed system prompt after JSON — extract first balanced object
+  const startIdx = rawContent.indexOf("{");
+  const source = startIdx >= 0 ? rawContent.slice(startIdx) : "{" + rawContent;
+  let depth = 0, inString = false, escape = false, endIdx = -1;
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\") { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    else if (ch === "}") { depth--; if (depth === 0) { endIdx = i; break; } }
+  }
+  if (endIdx !== -1) {
+    try { return JSON.parse(source.slice(0, endIdx + 1)); } catch { }
+  }
+  return null;
 }
 
 /**
@@ -48,7 +89,15 @@ function extractJSON(raw: string): string {
 async function callLMStudio(
   schema: unknown,
   userQuery: string,
+  columnList: string[],
 ): Promise<Record<string, unknown> | null> {
+  const userContent = JSON.stringify({
+    schema,
+    user_query: userQuery,
+    available_columns: columnList,
+    instruction: `Use ONLY column names from available_columns for x_axis, y_axis, filters.column, aggregation.group_by, and color_by.`,
+  });
+
   const res = await fetch(`${LM_STUDIO_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -56,13 +105,12 @@ async function callLMStudio(
       model: LM_STUDIO_MODEL,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content: JSON.stringify({ schema, user_query: userQuery }),
-        },
+        { role: 'user', content: userContent },
       ],
       temperature: 0.1,
       stream: false,
+      max_tokens: 200,
+      stop: ["\n\n##", "## Intent", "### Query", "### Instr"],
     }),
   });
 
@@ -72,34 +120,29 @@ async function callLMStudio(
   }
 
   const data = await res.json();
-  const content: string = data?.choices?.[0]?.message?.content ?? '';
+  const rawContent: string = data?.choices?.[0]?.message?.content ?? '';
 
-  try {
-    return JSON.parse(extractJSON(content));
-  } catch {
-    console.error('Failed to parse LM Studio response as JSON:', content);
+  const parsed = extractJson(rawContent);
+  if (!parsed) {
+    console.error('Failed to extract JSON from LM Studio response:', rawContent);
     return null;
   }
+  return parsed as Record<string, unknown>;
 }
 
 /**
- * Validate that the parsed response has the expected shape:
- * { intent: string, chart_config: { type: string, x_axis: string, y_axis: string } }
- */
-/**
  * Validate response shape. Accepts two valid intents:
  * - "visualize": must have chart_config with type, x_axis, y_axis
- * - "unknown": must have message string
+ * - "unknown":   must have message string
+ * - "analyze":   must have analysis_config with required fields
  */
 function isValidResponse(obj: Record<string, unknown>): boolean {
   if (typeof obj.intent !== 'string') return false;
 
-  // Unknown intent — model says it can't help
   if (obj.intent === 'unknown') {
     return typeof obj.message === 'string';
   }
 
-  // Visualize intent — must have chart_config
   if (obj.intent === 'visualize') {
     const cc = obj.chart_config;
     if (!cc || typeof cc !== 'object') return false;
@@ -111,13 +154,78 @@ function isValidResponse(obj: Record<string, unknown>): boolean {
     );
   }
 
+  if (obj.intent === 'analyze') {
+    const ac = obj.analysis_config;
+    if (!ac || typeof ac !== 'object') return false;
+    const config = ac as Record<string, unknown>;
+    return (
+      typeof config.operation === 'string' &&
+      typeof config.metric === 'string' &&
+      typeof config.aggregation === 'string'
+      // group_by is optional: model omits it when using filters for compare/rank
+    );
+  }
+
   return false;
+}
+
+function buildSqlFromChartConfig(cc: Record<string, unknown>, tableName = "data"): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const aggFn = (cc.aggregation as any)?.function?.toUpperCase() ?? "SUM";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const groupBy = (cc.aggregation as any)?.group_by ?? cc.x_axis;
+  const yAxis = cc.y_axis as string;
+
+  let sql = `SELECT "${groupBy}", ${aggFn}(CAST(REPLACE("${yAxis}", ',', '') AS REAL)) AS value\nFROM "${tableName}"`;
+
+  const filters = cc.filters as Array<{ column: string; operator: string; value: unknown }> | undefined;
+  if (filters && filters.length > 0) {
+    const whereClauses = filters.map(f => {
+      if (f.operator === 'in' && Array.isArray(f.value)) {
+        const vals = f.value.map((v: unknown) => `'${v}'`).join(', ');
+        return `"${f.column}" IN (${vals})`;
+      }
+      return `"${f.column}" = '${f.value}'`;
+    });
+    sql += `\nWHERE ${whereClauses.join(' AND ')}`;
+  }
+
+  sql += `\nGROUP BY "${groupBy}"\nORDER BY value DESC\nLIMIT 50`;
+  return sql;
+}
+
+function buildSqlFromAnalysisConfig(ac: Record<string, unknown>, tableName = "data"): string {
+  const aggFn = (ac.aggregation as string)?.toUpperCase() ?? "SUM";
+  const metric = ac.metric as string;
+  const groupBy = (ac.group_by as string)
+    ?? (ac.filters as Array<{column: string}>)?.[0]?.column
+    ?? (ac.metric as string);
+  const limit = typeof ac.limit === 'number' ? ac.limit : null;
+
+  let sql = `SELECT "${groupBy}", ${aggFn}(CAST(REPLACE("${metric}", ',', '') AS REAL)) AS value\nFROM "${tableName}"`;
+
+  const filters = ac.filters as Array<{ column: string; operator: string; value: unknown }> | undefined;
+  if (filters && filters.length > 0) {
+    const whereClauses = filters.map(f => {
+      if (f.operator === 'in' && Array.isArray(f.value)) {
+        const vals = f.value.map((v: unknown) => `'${v}'`).join(', ');
+        return `"${f.column}" IN (${vals})`;
+      }
+      return `"${f.column}" = '${f.value}'`;
+    });
+    sql += `\nWHERE ${whereClauses.join(' AND ')}`;
+  }
+
+  sql += `\nGROUP BY "${groupBy}"\nORDER BY value DESC`;
+  if (limit) sql += `\nLIMIT ${limit}`;
+
+  return sql;
 }
 
 /**
  * POST /api/chat
  *
- * Body: { schema: SchemaItem[], user_query: string }
+ * Body:     { schema: SchemaItem[], user_query: string }
  * Response: { intent, chart_config } or { error }
  */
 export async function POST(request: NextRequest) {
@@ -132,13 +240,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Extract column names from schema for the AI prompt
+    const columnList: string[] = Array.isArray(schema)
+      ? schema.map((s: { column_name?: string }) => s.column_name ?? '').filter(Boolean)
+      : [];
+
     // Attempt 1
-    let result = await callLMStudio(schema, user_query);
+    let result = await callLMStudio(schema, user_query, columnList);
 
     // If parse failed, retry once
     if (!result) {
       console.log('Retry: first attempt returned null, retrying...');
-      result = await callLMStudio(schema, user_query);
+      result = await callLMStudio(schema, user_query, columnList);
     }
 
     if (!result) {
@@ -166,11 +279,78 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Visualize intent — pass chart_config
-    return NextResponse.json({
-      intent: result.intent,
-      chart_config: result.chart_config,
-    });
+    // Handle visualze or analyze intent
+    if (result.intent === 'visualize' || result.intent === 'analyze') {
+      const { generateAndRunSql, executeSql } = await import('@/lib/sqlAgent');
+      
+      let sqlData: { sql: string; rows: Record<string, unknown>[]; error?: string } | null = null;
+      
+      if (result.intent === 'visualize' && result.chart_config) {
+        try {
+          const builtSql = buildSqlFromChartConfig(result.chart_config as Record<string, unknown>);
+          sqlData = executeSql(builtSql);
+          if (sqlData.error || sqlData.rows.length === 0) {
+            sqlData = null; // fallback
+          }
+        } catch (err) {
+          console.error("Failed to build/execute visualize SQL manually:", err);
+        }
+      } else if (result.intent === 'analyze' && result.analysis_config) {
+        try {
+          const builtSql = buildSqlFromAnalysisConfig(result.analysis_config as Record<string, unknown>);
+          sqlData = executeSql(builtSql);
+          if (sqlData.error || sqlData.rows.length === 0) {
+            sqlData = null; // fallback
+          }
+        } catch (err) {
+          console.error("Failed to build/execute analyze SQL manually:", err);
+        }
+      }
+
+      if (!sqlData) {
+        sqlData = await generateAndRunSql(user_query);
+      }
+
+      const { sql, rows, error } = sqlData;
+
+      if (error) {
+        return NextResponse.json({
+          intent: 'analyze', // Use analyze intent to show the error message bubble
+          message: 'Không thể phân tích câu hỏi này',
+        });
+      }
+
+      if (rows.length === 0) {
+        return NextResponse.json({
+          intent: 'analyze',
+          message: 'Không tìm thấy dữ liệu phù hợp',
+        });
+      }
+
+      if (result.intent === 'visualize') {
+        return NextResponse.json({
+          intent: 'visualize',
+          chart_config: result.chart_config,
+          sql_data: rows,
+        });
+      } else {
+        // analyze
+        const columns = Object.keys(rows[0]);
+        const tableHeader = `| ${columns.join(' | ')} |`;
+        const tableDivider = `| ${columns.map(() => '---').join(' | ')} |`;
+        const tableRows = rows
+          .map((r) => `| ${columns.map((c) => String(r[c] ?? '')).join(' | ')} |`)
+          .join('\n');
+        const markdownTable = `${tableHeader}\n${tableDivider}\n${tableRows}`;
+
+        return NextResponse.json({
+          intent: 'analyze',
+          markdownTable,
+        });
+      }
+    }
+
+    return NextResponse.json({ error: 'Lỗi không xác định' }, { status: 500 });
   } catch (error) {
     console.error('Chat API error:', error);
 

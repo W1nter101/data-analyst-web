@@ -19,7 +19,7 @@ import {
   LineChart,
 } from 'recharts';
 
-import type { ChartConfig, ParsedCSV } from '@/types';
+import type { ChartConfig, ChartFilterDef, ParsedCSV } from '@/types';
 
 type ChartRendererProps = {
   chartConfig: ChartConfig;
@@ -47,13 +47,55 @@ function toNumber(raw: string): number {
   return Number.parseFloat(cleaned);
 }
 
-function buildChartData(parsed: ParsedCSV, xColumn: string, yColumn: string): { data: ChartPoint[], note?: string } {
+// ── Filter rows using ChartConfig.filters ─────────────────────────
+
+function applyFilters(
+  rows: Record<string, string>[],
+  filters: ChartFilterDef[],
+): Record<string, string>[] {
+  return rows.filter((row) =>
+    filters.every((f) => {
+      const cell = String(row[f.column] ?? '').trim();
+      const cellLower = cell.toLowerCase();
+
+      switch (f.operator) {
+        case 'eq':
+          return cellLower === String(f.value).trim().toLowerCase();
+        case 'in': {
+          const vals = (Array.isArray(f.value) ? f.value : [f.value]).map((v) =>
+            String(v).trim().toLowerCase(),
+          );
+          return vals.includes(cellLower);
+        }
+        case 'gt':
+          return Number(cell) > Number(f.value);
+        case 'lt':
+          return Number(cell) < Number(f.value);
+        case 'gte':
+          return Number(cell) >= Number(f.value);
+        case 'lte':
+          return Number(cell) <= Number(f.value);
+        case 'contains':
+          return cellLower.includes(String(f.value).trim().toLowerCase());
+        default:
+          return true;
+      }
+    }),
+  );
+}
+
+// ── Build chart data from rows ────────────────────────────────────
+
+function buildChartData(
+  rows: Record<string, string>[],
+  xColumn: string,
+  yColumn: string,
+  schema: ParsedCSV['schema'],
+): { data: ChartPoint[]; note?: string } {
   // Aggregate: group by xColumn, sum yColumn per group.
-  // Without this, "Units Sold by Country" would show every raw row
-  // instead of one summed bar per country.
   const groups = new Map<string, number>();
 
-  for (const row of parsed.rows) {
+  for (const row of rows) {
     const xRaw = row[xColumn];
     const yRaw = row[yColumn];
     if (xRaw == null || yRaw == null) continue;
@@ -66,23 +108,17 @@ function buildChartData(parsed: ParsedCSV, xColumn: string, yColumn: string): { 
   let entries = Array.from(groups.entries());
   let note: string | undefined;
 
-  const xSchema = parsed.schema.find((col) => col.name === xColumn);
+  const xSchema = schema.find((col) => col.name === xColumn);
   const xType = xSchema?.type || 'string';
 
   // Apply a limit if there are > 50 unique X values
   if (entries.length > 50) {
-    // keep top 20 by Y value
     entries.sort((a, b) => b[1] - a[1]);
     entries = entries.slice(0, 20);
     note = `Hiển thị top 20 trong số ${groups.size} mục (do có quá nhiều dữ liệu)`;
   } else {
-    // Sort appropriately
     if (xType === 'number') {
-      entries.sort((a, b) => {
-        const numA = Number(a[0]);
-        const numB = Number(b[0]);
-        return numA - numB;
-      });
+      entries.sort((a, b) => Number(a[0]) - Number(b[0]));
     } else if (xType === 'date') {
       entries.sort((a, b) => {
         const dateA = new Date(a[0]).getTime();
@@ -90,7 +126,6 @@ function buildChartData(parsed: ParsedCSV, xColumn: string, yColumn: string): { 
         return (Number.isNaN(dateA) ? 0 : dateA) - (Number.isNaN(dateB) ? 0 : dateB);
       });
     }
-    // For string, show ALL unique values, no limit
   }
 
   const data = entries.map(([x, y]) => ({ x, y }));
@@ -122,7 +157,13 @@ export function ChartRenderer({ chartConfig, data }: ChartRendererProps) {
     return <MissingColumnsError />;
   }
 
-  const { data: chartData, note } = buildChartData(data, xColumn, yColumn);
+  // Apply AI-generated filters before aggregation
+  const filteredRows =
+    chartConfig.filters && chartConfig.filters.length > 0
+      ? applyFilters(data.rows, chartConfig.filters)
+      : data.rows;
+
+  const { data: chartData, note } = buildChartData(filteredRows, xColumn, yColumn, data.schema);
   if (chartData.length === 0) {
     return <EmptyChartState />;
   }
@@ -136,6 +177,17 @@ export function ChartRenderer({ chartConfig, data }: ChartRendererProps) {
   const xAxisProps = isStringX
     ? { interval: 0, angle: -35, textAnchor: 'end' as const, height: 60, tick: { fontSize: 11 } }
     : { interval: 'preserveStartEnd' as const };
+
+  const tooltipStyle = {
+    backgroundColor: '#1f2937',
+    color: '#f9fafb',
+    border: '1px solid #374151',
+    borderRadius: '0.5rem',
+  };
+  
+  const tooltipItemStyle = {
+    color: '#f9fafb',
+  };
 
   return (
     <div className="flex h-full w-full flex-col rounded-xl border border-black/10 bg-background p-2 dark:border-white/15">
@@ -151,7 +203,11 @@ export function ChartRenderer({ chartConfig, data }: ChartRendererProps) {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="x" />
             <YAxis tickFormatter={yTickFormatter} />
-            <Tooltip formatter={(value) => Number(value).toLocaleString()} />
+            <Tooltip 
+              formatter={(value) => Number(value).toLocaleString()} 
+              contentStyle={tooltipStyle}
+              itemStyle={tooltipItemStyle}
+            />
             <Bar dataKey="y" fill="#2563eb" />
           </BarChart>
         ) : type === 'line' ? (
@@ -159,7 +215,11 @@ export function ChartRenderer({ chartConfig, data }: ChartRendererProps) {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="x" {...xAxisProps} />
             <YAxis tickFormatter={yTickFormatter} />
-            <Tooltip formatter={(value) => Number(value).toLocaleString()} />
+            <Tooltip 
+              formatter={(value) => Number(value).toLocaleString()} 
+              contentStyle={tooltipStyle}
+              itemStyle={tooltipItemStyle}
+            />
             <Line type="monotone" dataKey="y" stroke="#7c3aed" dot={false} />
           </LineChart>
         ) : type === 'area' ? (
@@ -167,12 +227,20 @@ export function ChartRenderer({ chartConfig, data }: ChartRendererProps) {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="x" {...xAxisProps} />
             <YAxis tickFormatter={yTickFormatter} />
-            <Tooltip formatter={(value) => Number(value).toLocaleString()} />
+            <Tooltip 
+              formatter={(value) => Number(value).toLocaleString()} 
+              contentStyle={tooltipStyle}
+              itemStyle={tooltipItemStyle}
+            />
             <Area type="monotone" dataKey="y" stroke="#16a34a" fill="#16a34a" fillOpacity={0.25} />
           </AreaChart>
         ) : type === 'pie' ? (
           <PieChart>
-            <Tooltip formatter={(value) => Number(value).toLocaleString()} />
+            <Tooltip 
+              formatter={(value) => Number(value).toLocaleString()} 
+              contentStyle={tooltipStyle}
+              itemStyle={tooltipItemStyle}
+            />
             <Pie data={chartData} dataKey="y" nameKey="x" cx="50%" cy="50%" outerRadius={100}>
               {chartData.map((entry, index) => (
                 <Cell key={`${entry.x}-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
@@ -184,7 +252,11 @@ export function ChartRenderer({ chartConfig, data }: ChartRendererProps) {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="x" type="category" name={xColumn} />
             <YAxis dataKey="y" tickFormatter={yTickFormatter} name={yColumn} />
-            <Tooltip formatter={(value) => Number(value).toLocaleString()} />
+            <Tooltip 
+              formatter={(value) => Number(value).toLocaleString()} 
+              contentStyle={tooltipStyle}
+              itemStyle={tooltipItemStyle}
+            />
             <Scatter data={chartData} fill="#ea580c" />
           </ScatterChart>
         )}

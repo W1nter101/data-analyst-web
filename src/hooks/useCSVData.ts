@@ -17,6 +17,19 @@ export function useCSVData() {
       setLoading(true);
       setError(null);
       try {
+        const csvText = await file.text();
+        
+        // 1. Upload to server for SQLite
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ csvText }),
+        });
+        if (!res.ok) {
+          throw new Error('Failed to upload CSV to server');
+        }
+
+        // 2. Parse and store in client (Zustand)
         const parsed = await parseCSVFile(file);
         setCSV(parsed);
       } catch (e) {

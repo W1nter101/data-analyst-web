@@ -19,6 +19,23 @@ export interface ParsedCSV {
 
 export type ChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'area';
 
+export interface ChartFilterDef {
+  column: string;
+  operator: 'eq' | 'in' | 'gt' | 'lt' | 'gte' | 'lte' | 'contains';
+  value: string | string[] | number;
+}
+
+export type AggregationType = 'sum' | 'avg' | 'count' | 'max' | 'min';
+export type OperationType = 'compare' | 'trend' | 'rank' | 'summary';
+
+export interface AnalysisConfig {
+  operation: OperationType;
+  metric: string;
+  group_by: string;
+  filters?: ChartFilterDef[];
+  aggregation: AggregationType;
+}
+
 export interface ChartConfig {
   id: string;
   type: ChartType;
@@ -26,11 +43,17 @@ export interface ChartConfig {
   xColumn: string;
   yColumn: string;
   colorColumn?: string;
+  filters?: ChartFilterDef[];
 }
+
+export type WidgetType = 'chart' | 'text' | 'image' | 'empty';
 
 export interface DashboardWidget {
   id: string;
-  chartId: string;
+  widgetType: WidgetType;
+  chartId?: string;
+  textContent?: string;
+  imageUrl?: string;
   layout: { x: number; y: number; w: number; h: number };
 }
 

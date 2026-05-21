@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { LeftPanel } from '@/components/dashboard/LeftPanel';
 import { RightPanel } from '@/components/dashboard/RightPanel';
+import { useAppStore } from '@/store/appStore';
 
 /**
  * DashboardShell — two-column layout for the dashboard.
@@ -15,6 +16,9 @@ import { RightPanel } from '@/components/dashboard/RightPanel';
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const activeTab = useAppStore((s) => s.activeTab);
+
+  const showLeftPanel = activeTab === 'board';
 
   const toggleCollapse = useCallback(() => setCollapsed((c) => !c), []);
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
@@ -24,19 +28,23 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div
       className="grid h-screen overflow-hidden bg-background text-foreground transition-[grid-template-columns] duration-300"
       style={{
-        gridTemplateColumns: collapsed ? '64px 1fr' : '360px 1fr',
+        gridTemplateColumns: showLeftPanel
+          ? collapsed ? '64px 1fr' : '360px 1fr'
+          : '1fr',
       }}
     >
-      {/* ── Desktop LeftPanel ────────────────────────────── */}
-      <div className="hidden md:flex">
-        <LeftPanel
-          collapsed={collapsed}
-          onToggleCollapse={toggleCollapse}
-        />
-      </div>
+      {/* ── Desktop LeftPanel (Board tab only) ───────────── */}
+      {showLeftPanel && (
+        <div className="hidden md:flex">
+          <LeftPanel
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapse}
+          />
+        </div>
+      )}
 
-      {/* ── Mobile drawer overlay ────────────────────────── */}
-      {drawerOpen && (
+      {/* ── Mobile drawer overlay (Board tab only) ────────── */}
+      {showLeftPanel && drawerOpen && (
         <div
           className="fixed inset-0 z-50 md:hidden"
           aria-label="Chat drawer"
@@ -58,7 +66,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       )}
 
       {/* ── RightPanel ───────────────────────────────────── */}
-      <RightPanel onOpenDrawer={openDrawer}>
+      <RightPanel onOpenDrawer={showLeftPanel ? openDrawer : undefined}>
         {children}
       </RightPanel>
     </div>

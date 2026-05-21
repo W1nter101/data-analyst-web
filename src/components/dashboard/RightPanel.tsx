@@ -18,7 +18,7 @@ import { useAuthStore } from '@/store/authStore';
  */
 interface RightPanelProps {
   children: React.ReactNode;
-  onOpenDrawer: () => void;
+  onOpenDrawer?: () => void;
 }
 
 export function RightPanel({ children, onOpenDrawer }: RightPanelProps) {
@@ -44,17 +44,19 @@ export function RightPanel({ children, onOpenDrawer }: RightPanelProps) {
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-foreground/10 bg-background px-4">
         {/* Left: hamburger (mobile) + title */}
         <div className="flex items-center gap-3">
-          {/* Hamburger — mobile only */}
-          <button
-            type="button"
-            onClick={onOpenDrawer}
-            className="flex size-8 items-center justify-center rounded-lg text-foreground/60 transition-colors hover:bg-foreground/5 hover:text-foreground md:hidden"
-            aria-label="Mở chat"
-          >
-            <svg className="size-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
-          </button>
+          {/* Hamburger — mobile only, Board tab only */}
+          {onOpenDrawer && (
+            <button
+              type="button"
+              onClick={onOpenDrawer}
+              className="flex size-8 items-center justify-center rounded-lg text-foreground/60 transition-colors hover:bg-foreground/5 hover:text-foreground md:hidden"
+              aria-label="Mở chat"
+            >
+              <svg className="size-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
+          )}
 
           <h1 className="text-sm font-semibold text-foreground">
             CSV Analyst
