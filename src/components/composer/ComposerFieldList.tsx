@@ -18,7 +18,7 @@ export function ComposerFieldList({ columns }: Props) {
 
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-foreground/45">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-faint)]">
         Fields
       </h3>
       {columns.map((col) => (
@@ -26,13 +26,13 @@ export function ComposerFieldList({ columns }: Props) {
           key={col.name}
           draggable
           onDragStart={(e) => handleDragStart(e, col)}
-          className="flex cursor-grab items-center gap-2 rounded-lg border border-foreground/8 bg-foreground/3 px-3 py-2 text-sm text-foreground transition-colors hover:border-foreground/15 hover:bg-foreground/6 active:cursor-grabbing"
+          className="flex cursor-grab items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text)] transition-colors hover:border-[var(--color-accent)] hover:bg-[var(--color-surface-2)] active:cursor-grabbing"
         >
-          <span className="flex size-6 shrink-0 items-center justify-center rounded bg-foreground/8 text-[10px] font-semibold text-foreground/50">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded bg-[var(--color-surface-2)] text-[10px] font-semibold text-[var(--color-text-muted)]">
             {typeIcon(col.type)}
           </span>
           <span className="min-w-0 truncate font-medium">{col.name}</span>
-          <span className="ml-auto shrink-0 text-[10px] text-foreground/35">
+          <span className="ml-auto shrink-0 text-[10px] text-[var(--color-text-faint)]">
             {col.type}
           </span>
         </div>

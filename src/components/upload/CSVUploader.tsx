@@ -100,48 +100,48 @@ export function CSVUploader() {
 
       {isLoading ? (
         <div
-          className="flex min-h-[200px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-black/20 bg-black/[.02] px-6 py-10 dark:border-white/20 dark:bg-white/[.04]"
+          className="flex min-h-[200px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-10"
           role="status"
           aria-live="polite"
           aria-busy="true"
         >
           <div
-            className="size-10 rounded-full border-2 border-current border-t-transparent animate-spin text-foreground"
+            className="size-10 rounded-full border-2 border-current border-t-transparent animate-spin text-[var(--color-text)]"
             aria-hidden
           />
-          <p className="text-sm font-medium text-foreground">Parsing…</p>
+          <p className="text-sm font-medium text-[var(--color-text)]">Parsing…</p>
           {sizeWarning ? (
-            <p className="max-w-sm text-center text-xs text-amber-700 dark:text-amber-400">
+            <p className="max-w-sm text-center text-xs text-[var(--color-warning)]">
               This file is larger than 50 MB. Parsing may take a while.
             </p>
           ) : null}
         </div>
       ) : displayError ? (
         <div
-          className="flex min-h-[200px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-red-500/40 bg-red-500/[.06] px-6 py-10 dark:bg-red-500/[.08]"
+          className="flex min-h-[200px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-[var(--color-error)] bg-[var(--color-error)]/10 px-6 py-10"
           role="alert"
         >
-          <p className="text-center text-sm text-foreground">{displayError}</p>
+          <p className="text-center text-sm text-[var(--color-error)]">{displayError}</p>
           <button
             type="button"
             onClick={onRetry}
-            className="rounded-lg border border-black/15 bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06]"
+            className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-text)] transition-colors hover:bg-[var(--color-accent-hover)]"
           >
             Retry
           </button>
         </div>
       ) : showSuccess ? (
-        <div className="flex min-h-[200px] flex-col items-center justify-center gap-4 rounded-xl border border-solid border-black/15 bg-black/[.02] px-6 py-10 dark:border-white/20 dark:bg-white/[.04]">
+        <div className="flex min-h-[200px] flex-col items-center justify-center gap-4 rounded-xl border border-solid border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-10">
           <div className="text-center">
-            <p className="text-sm font-medium text-foreground">{lastFileName ?? 'Uploaded file'}</p>
-            <p className="mt-1 text-sm text-foreground/70">
+            <p className="text-sm font-medium text-[var(--color-text)]">{lastFileName ?? 'Uploaded file'}</p>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
               {csv!.rowCount.toLocaleString()} row{csv!.rowCount === 1 ? '' : 's'}
             </p>
           </div>
           <button
             type="button"
             onClick={onChangeFile}
-            className="rounded-lg border border-black/15 bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-black/[.04] dark:border-white/20 dark:hover:bg-white/[.06]"
+            className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-text)] transition-colors hover:bg-[var(--color-accent-hover)]"
           >
             Change file
           </button>
@@ -153,12 +153,12 @@ export function CSVUploader() {
             onClick={openPicker}
             onDrop={onDrop}
             onDragOver={onDragOver}
-            className="flex min-h-[200px] w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-black/20 bg-black/[.02] px-6 py-10 text-center transition-colors hover:border-black/35 hover:bg-black/[.04] dark:border-white/20 dark:bg-white/[.04] dark:hover:border-white/35 dark:hover:bg-white/[.06]"
+            className="flex min-h-[200px] w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-10 text-center transition-colors hover:border-[var(--color-accent)] hover:bg-[var(--color-surface-2)]"
           >
-            <span className="text-sm font-medium text-foreground">
+            <span className="text-sm font-medium text-[var(--color-text)]">
               Drag and drop a CSV here, or click to browse
             </span>
-            <span className="text-xs text-foreground/60">.csv only</span>
+            <span className="text-xs text-[var(--color-text-muted)]">.csv only</span>
           </button>
         </div>
       )}

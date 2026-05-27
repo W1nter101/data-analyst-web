@@ -1,14 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-import { getDb } from '@/lib/db';
+import Database from 'better-sqlite3';
+import { getSession } from '@/lib/session';
+import { storage } from '@/lib/storage';
+import appDb from '@/lib/appDb';
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await getSession(req);
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get('limit') || '100', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const fileId = searchParams.get('fileId');
 
-    const db = getDb();
+    if (!fileId) return NextResponse.json({ error: 'Missing fileId' }, { status: 400 });
+
+    const file = appDb.prepare('SELECT id FROM uploaded_files WHERE id = ? AND user_id = ?').get(fileId, session.userId);
+    if (!file) return NextResponse.json({ error: 'File not found' }, { status: 404 });
+
+    const dbPath = storage.getPath(session.userId, fileId);
+    const db = new Database(dbPath);
+    
+    // Ensure original table exists for backward compatibility
+    const originalExists = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='data_original'`).get();
+    if (!originalExists) {
+      db.exec(`CREATE TABLE "data_original" AS SELECT * FROM "data"`);
+    }
+    
     const rows = db.prepare(`SELECT rowid AS __rowid, * FROM "data" LIMIT ? OFFSET ?`).all(limit, offset);
 
     return NextResponse.json({ rows });
@@ -20,13 +39,26 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const { __rowid, column, value } = await req.json();
+    const session = await getSession(req);
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    if (__rowid === undefined || !column) {
-      return NextResponse.json({ error: 'Missing __rowid or column' }, { status: 400 });
+    const { __rowid, column, value, fileId } = await req.json();
+
+    if (__rowid === undefined || !column || !fileId) {
+      return NextResponse.json({ error: 'Missing __rowid, column, or fileId' }, { status: 400 });
     }
 
-    const db = getDb();
+    const file = appDb.prepare('SELECT id FROM uploaded_files WHERE id = ? AND user_id = ?').get(fileId, session.userId);
+    if (!file) return NextResponse.json({ error: 'File not found' }, { status: 404 });
+
+    const dbPath = storage.getPath(session.userId, fileId);
+    const db = new Database(dbPath);
+    
+    // Ensure original table exists for backward compatibility
+    const originalExists = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='data_original'`).get();
+    if (!originalExists) {
+      db.exec(`CREATE TABLE "data_original" AS SELECT * FROM "data"`);
+    }
     
     // Validate column exists
     const cols = db.prepare(`PRAGMA table_info("data")`).all() as { name: string }[];

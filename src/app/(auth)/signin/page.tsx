@@ -52,24 +52,24 @@ export default function SignInPage() {
   return (
     <div className="flex flex-col gap-6">
       {/* Card */}
-      <div className="overflow-hidden rounded-2xl border border-foreground/10 bg-background shadow-lg">
+      <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
         <div className="grid md:grid-cols-[1.2fr_0.8fr]">
           {/* Form column */}
           <form className="p-6 md:p-8" onSubmit={handleSubmit(onSubmit)}>
             <div className="flex flex-col gap-6">
               {/* Header */}
               <div className="flex flex-col items-center gap-2 text-center">
-                <h1 className="text-2xl font-bold text-foreground">
+                <h1 className="text-2xl font-bold text-[var(--color-text)]">
                   Chào mừng quay lại
                 </h1>
-                <p className="text-sm text-foreground/60">
+                <p className="text-sm text-[var(--color-text-muted)]">
                   Đăng nhập tài khoản của bạn
                 </p>
               </div>
 
               {/* API error */}
               {apiError && (
-                <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
+                <div className="rounded-lg border border-[var(--color-error)] bg-[var(--color-error)]/10 px-4 py-3 text-sm text-[var(--color-error)]">
                   {apiError}
                 </div>
               )}
@@ -78,7 +78,7 @@ export default function SignInPage() {
               <div className="flex flex-col gap-2">
                 <label
                   htmlFor="username"
-                  className="text-sm font-medium text-foreground"
+                  className="text-sm font-medium text-[var(--color-text)]"
                 >
                   Tên đăng nhập
                 </label>
@@ -87,11 +87,11 @@ export default function SignInPage() {
                   id="username"
                   placeholder="tên đăng nhập"
                   autoComplete="username"
-                  className="rounded-lg border border-foreground/15 bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-foreground/40 focus:border-foreground/30 focus:ring-2 focus:ring-foreground/10"
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-text-faint)] focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/30"
                   {...register('username')}
                 />
                 {errors.username && (
-                  <p className="text-sm text-red-600 dark:text-red-400">
+                  <p className="text-sm text-[var(--color-error)]">
                     {errors.username.message}
                   </p>
                 )}
@@ -101,7 +101,7 @@ export default function SignInPage() {
               <div className="flex flex-col gap-2">
                 <label
                   htmlFor="password"
-                  className="text-sm font-medium text-foreground"
+                  className="text-sm font-medium text-[var(--color-text)]"
                 >
                   Mật khẩu
                 </label>
@@ -109,11 +109,11 @@ export default function SignInPage() {
                   type="password"
                   id="password"
                   autoComplete="current-password"
-                  className="rounded-lg border border-foreground/15 bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-foreground/40 focus:border-foreground/30 focus:ring-2 focus:ring-foreground/10"
+                  className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-text-faint)] focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/30"
                   {...register('password')}
                 />
                 {errors.password && (
-                  <p className="text-sm text-red-600 dark:text-red-400">
+                  <p className="text-sm text-[var(--color-error)]">
                     {errors.password.message}
                   </p>
                 )}
@@ -123,20 +123,20 @@ export default function SignInPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--color-accent)] px-4 py-2.5 text-sm font-medium text-[var(--color-text)] transition-colors hover:bg-[var(--color-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSubmitting && (
-                  <span className="size-4 animate-spin rounded-full border-2 border-background/30 border-t-background" />
+                  <span className="size-4 animate-spin rounded-full border-2 border-[var(--color-text)]/30 border-t-[var(--color-text)]" />
                 )}
                 {isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
               </button>
 
               {/* Link to signup */}
-              <div className="text-center text-sm text-foreground/60">
+              <div className="text-center text-sm text-[var(--color-text-muted)]">
                 Chưa có tài khoản?{' '}
                 <Link
                   href="/signup"
-                  className="font-medium text-foreground underline underline-offset-4 transition-colors hover:text-foreground/80"
+                  className="font-medium text-[var(--color-accent)] underline underline-offset-4 transition-colors hover:text-[var(--color-accent-hover)]"
                 >
                   Đăng ký
                 </Link>
@@ -155,9 +155,9 @@ export default function SignInPage() {
             />
             <div className="flex h-full items-center justify-center p-8">
               <div className="text-center">
-                <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl bg-foreground/5">
+                <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl bg-[var(--color-surface-2)]">
                   <svg
-                    className="size-8 text-foreground/40"
+                    className="size-8 text-[var(--color-text-faint)]"
                     fill="none"
                     viewBox="0 0 24 24"
                     strokeWidth={1.5}
@@ -170,10 +170,10 @@ export default function SignInPage() {
                     />
                   </svg>
                 </div>
-                <p className="text-sm font-medium text-foreground/50">
+                <p className="text-sm font-medium text-[var(--color-text-muted)]">
                   CSV Data Analyst
                 </p>
-                <p className="mt-1 text-xs text-foreground/35">
+                <p className="mt-1 text-xs text-[var(--color-text-faint)]">
                   Phân tích dữ liệu thông minh
                 </p>
               </div>
@@ -183,7 +183,7 @@ export default function SignInPage() {
       </div>
 
       {/* Footer */}
-      <p className="px-6 text-center text-xs text-foreground/40">
+      <p className="px-6 text-center text-xs text-[var(--color-text-faint)]">
         Bằng cách tiếp tục, bạn đồng ý với{' '}
         <span className="underline underline-offset-4">
           Điều khoản dịch vụ

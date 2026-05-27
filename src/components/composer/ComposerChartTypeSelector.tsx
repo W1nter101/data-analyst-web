@@ -17,7 +17,7 @@ type Props = {
 
 export function ComposerChartTypeSelector({ value, onChange }: Props) {
   return (
-    <div className="flex gap-1 rounded-lg border border-foreground/10 bg-foreground/3 p-1">
+    <div className="flex gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
       {CHART_TYPES.map((ct) => {
         const isActive = value === ct.key;
         return (
@@ -27,8 +27,8 @@ export function ComposerChartTypeSelector({ value, onChange }: Props) {
             onClick={() => onChange(ct.key)}
             className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
               isActive
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-foreground/45 hover:text-foreground/70'
+                ? 'bg-[var(--color-bg)] text-[var(--color-text)] shadow-sm'
+                : 'text-[var(--color-text-faint)] hover:text-[var(--color-text)]'
             }`}
           >
             <span className="text-xs">{ct.icon}</span>

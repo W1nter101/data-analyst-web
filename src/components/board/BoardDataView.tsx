@@ -86,10 +86,10 @@ export function BoardDataView() {
   // ── Empty state: no widgets ────────────────────────────
   if (tables.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-foreground/15 bg-foreground/2 px-6 py-16 text-center">
-        <div className="flex size-14 items-center justify-center rounded-full bg-foreground/5">
+      <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-2)] px-6 py-16 text-center">
+        <div className="flex size-14 items-center justify-center rounded-full bg-[var(--color-surface)]">
           <svg
-            className="size-7 text-foreground/25"
+            className="size-7 text-[var(--color-text-faint)]"
             fill="none"
             viewBox="0 0 24 24"
             strokeWidth={1.5}
@@ -103,17 +103,17 @@ export function BoardDataView() {
           </svg>
         </div>
         <div>
-          <p className="text-sm font-medium text-foreground/65">
+          <p className="text-sm font-medium text-[var(--color-text-muted)]">
             Chưa có chart nào trên Board
           </p>
-          <p className="mt-1 text-xs text-foreground/40">
+          <p className="mt-1 text-xs text-[var(--color-text-faint)]">
             Tạo chart từ Chart Composer để bắt đầu
           </p>
         </div>
         <button
           type="button"
           onClick={() => router.push('/visual-board-chart-composer')}
-          className="mt-1 rounded-lg bg-foreground/10 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-foreground/15"
+          className="mt-1 rounded-lg bg-[var(--color-surface)] px-4 py-2 text-sm font-medium text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-2)]"
         >
           Mở Chart Composer
         </button>
@@ -122,11 +122,11 @@ export function BoardDataView() {
   }
 
   return (
-    <div className="flex gap-0 rounded-xl border border-foreground/10 overflow-hidden" style={{ minHeight: 400 }}>
+    <div className="flex gap-0 rounded-xl border border-[var(--color-border)] overflow-hidden" style={{ minHeight: 400 }}>
       {/* ── Left sidebar: table list ──────────────────── */}
-      <div className="w-60 shrink-0 border-r border-foreground/10 bg-foreground/[0.02] overflow-y-auto">
+      <div className="w-60 shrink-0 border-r border-[var(--color-border)] bg-[var(--color-surface-2)] overflow-y-auto">
         <div className="p-3">
-          <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-foreground/40">
+          <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-faint)]">
             Board Tables
           </h3>
           <div className="flex flex-col gap-1">
@@ -139,18 +139,18 @@ export function BoardDataView() {
                   onClick={() => setSelectedIdx(idx)}
                   className={`flex items-start gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors ${
                     isSelected
-                      ? 'border border-[var(--color-primary,#4f98a3)] bg-[var(--color-primary,#4f98a3)]/8'
-                      : 'border border-transparent hover:bg-foreground/5'
+                      ? 'border border-[var(--color-accent)] bg-[var(--color-accent)]/8'
+                      : 'border border-transparent hover:bg-[var(--color-surface-2)]'
                   }`}
                 >
-                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded bg-foreground/8 text-[10px] font-bold text-foreground/50">
+                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded bg-[var(--color-surface-2)] text-[10px] font-bold text-[var(--color-text-faint)]">
                     {chartTypeIcon(table.config.type)}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold text-foreground">
+                    <p className="truncate text-xs font-semibold text-[var(--color-text)]">
                       {table.config.title}
                     </p>
-                    <p className="truncate text-[10px] text-foreground/35">
+                    <p className="truncate text-[10px] text-[var(--color-text-faint)]">
                       {table.snakeName}
                     </p>
                   </div>
@@ -166,19 +166,19 @@ export function BoardDataView() {
         {selected ? (
           <>
             {/* Action bar */}
-            <div className="flex items-center justify-between border-b border-foreground/10 px-4 py-3">
+            <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
               <div className="flex items-center gap-3">
-                <h3 className="text-sm font-bold text-foreground">
+                <h3 className="text-sm font-bold text-[var(--color-text)]">
                   {selected.config.title}
                 </h3>
-                <span className="rounded-full bg-foreground/8 px-2 py-0.5 text-[10px] font-medium text-foreground/55">
+                <span className="rounded-full bg-[var(--color-surface-2)] px-2 py-0.5 text-[10px] font-medium text-[var(--color-text-muted)]">
                   {selected.rows.length} rows
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => handleGoToChart(selected.widget.id)}
-                className="flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-opacity hover:opacity-85"
+                className="flex items-center gap-1.5 rounded-lg bg-[var(--color-text)] px-3 py-1.5 text-xs font-semibold text-[var(--color-bg)] transition-opacity hover:opacity-85"
               >
                 <span className="text-[10px]">
                   {chartTypeIcon(selected.config.type)}
@@ -190,12 +190,12 @@ export function BoardDataView() {
             {/* Table */}
             <div className="flex-1 overflow-auto">
               <table className="w-full min-w-max border-collapse text-sm">
-                <thead className="sticky top-0 z-10 border-b border-foreground/10 bg-background">
+                <thead className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-bg)]">
                   <tr>
                     {selected.columns.map((col) => (
                       <th
                         key={col}
-                        className={`min-w-[120px] px-4 py-2.5 text-xs font-semibold text-foreground/60 ${
+                        className={`min-w-[120px] px-4 py-2.5 text-xs font-semibold text-[var(--color-text-muted)] ${
                           col === selected.config.yColumn
                             ? 'text-right'
                             : 'text-left'
@@ -210,8 +210,8 @@ export function BoardDataView() {
                   {selected.rows.map((row, rIdx) => (
                     <tr
                       key={rIdx}
-                      className={`border-b border-foreground/5 last:border-0 ${
-                        rIdx % 2 === 1 ? 'bg-foreground/[0.02]' : ''
+                      className={`border-b border-[var(--color-border)] last:border-0 ${
+                        rIdx % 2 === 1 ? 'bg-[var(--color-surface)]' : ''
                       }`}
                     >
                       {selected.columns.map((col) => {
@@ -220,7 +220,7 @@ export function BoardDataView() {
                         return (
                           <td
                             key={col}
-                            className={`min-w-[120px] px-4 py-2 text-foreground/80 ${
+                            className={`min-w-[120px] px-4 py-2 text-[var(--color-text)] ${
                               isNumeric
                                 ? 'text-right tabular-nums font-medium'
                                 : 'text-left'
@@ -238,7 +238,7 @@ export function BoardDataView() {
                     <tr>
                       <td
                         colSpan={selected.columns.length}
-                        className="px-4 py-8 text-center text-sm text-foreground/40"
+                        className="px-4 py-8 text-center text-sm text-[var(--color-text-faint)]"
                       >
                         No aggregated data
                       </td>
@@ -249,7 +249,7 @@ export function BoardDataView() {
             </div>
           </>
         ) : (
-          <div className="flex flex-1 items-center justify-center text-sm text-foreground/40">
+          <div className="flex flex-1 items-center justify-center text-sm text-[var(--color-text-faint)]">
             Select a table from the sidebar
           </div>
         )}

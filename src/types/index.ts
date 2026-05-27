@@ -44,9 +44,10 @@ export interface ChartConfig {
   yColumn: string;
   colorColumn?: string;
   filters?: ChartFilterDef[];
+  sortOrder?: 'asc' | 'desc' | 'none';
 }
 
-export type WidgetType = 'chart' | 'text' | 'image' | 'empty';
+export type WidgetType = 'chart' | 'text' | 'image' | 'table' | 'empty';
 
 export interface DashboardWidget {
   id: string;
@@ -54,6 +55,12 @@ export interface DashboardWidget {
   chartId?: string;
   textContent?: string;
   imageUrl?: string;
+  tableData?: {
+    title: string;
+    rows: number;
+    cols: number;
+    cells: string[][]; // 2D array of strings
+  };
   layout: { x: number; y: number; w: number; h: number };
 }
 

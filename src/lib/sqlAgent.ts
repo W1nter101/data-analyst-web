@@ -1,5 +1,5 @@
 import { getTableSchema } from './csvToSqlite';
-import { getDb } from './db';
+import Database from 'better-sqlite3';
 
 const LM_STUDIO_BASE_URL =
   process.env.LM_STUDIO_BASE_URL ?? 'http://localhost:1234/v1';
@@ -12,10 +12,11 @@ export interface SqlResult {
 }
 
 export async function generateAndRunSql(
+  dbPath: string,
   userQuestion: string,
   tableName = 'data',
 ): Promise<SqlResult> {
-  const schema = getTableSchema(tableName);
+  const schema = getTableSchema(dbPath, tableName);
 
   const systemPrompt = `You are a SQL expert. Generate a single SQLite SELECT query.
 Table name: "${tableName}"
@@ -55,13 +56,14 @@ Rules:
   }
 
   // Execute
-  return executeSql(sql);
+  return executeSql(dbPath, sql);
 }
 
-export function executeSql(sql: string, tableName = 'data'): SqlResult {
+export function executeSql(dbPath: string, sql: string, tableName = 'data'): SqlResult {
   try {
-    const db = getDb();
+    const db = new Database(dbPath, { readonly: true });
     const rows = db.prepare(sql).all() as Record<string, unknown>[];
+    db.close();
     return { sql, rows };
   } catch (err) {
     return { sql, rows: [], error: String(err) };

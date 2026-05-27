@@ -35,7 +35,7 @@ export function ImageWidget({ widget }: Props) {
 
   return (
     <div
-      className="relative flex h-full flex-col overflow-hidden rounded-xl border border-foreground/10 bg-background"
+      className="relative flex h-full flex-col overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -49,10 +49,10 @@ export function ImageWidget({ widget }: Props) {
       />
 
       {/* Drag handle */}
-      <div className="chart-drag-handle flex shrink-0 cursor-grab items-center justify-between gap-2 border-b border-foreground/5 px-3 py-2 active:cursor-grabbing">
+      <div className="chart-drag-handle flex shrink-0 cursor-grab items-center justify-between gap-2 border-b border-[var(--color-border)] px-3 py-2 active:cursor-grabbing">
         <div className="flex items-center gap-2">
           <svg
-            className="size-4 shrink-0 text-foreground/40"
+            className="no-print size-4 shrink-0 text-[var(--color-text-faint)]"
             viewBox="0 0 16 16"
             fill="currentColor"
             aria-hidden="true"
@@ -64,14 +64,14 @@ export function ImageWidget({ widget }: Props) {
             <circle cx="4" cy="13" r="1.5" />
             <circle cx="12" cy="13" r="1.5" />
           </svg>
-          <span className="text-xs font-medium text-foreground/50">Image</span>
+          <span className="text-xs font-medium text-[var(--color-text-muted)]">Image</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 no-print">
           {widget.imageUrl && (
             <button
               type="button"
               onClick={handleReplace}
-              className="rounded-md px-1.5 py-0.5 text-xs text-foreground/40 transition-colors hover:bg-foreground/5 hover:text-foreground"
+              className="rounded-md px-1.5 py-0.5 text-xs text-[var(--color-text-faint)] transition-colors hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]"
             >
               Replace
             </button>
@@ -79,7 +79,7 @@ export function ImageWidget({ widget }: Props) {
           <button
             type="button"
             onClick={() => removeWidget(widget.id)}
-            className="rounded-md px-1.5 py-0.5 text-xs text-foreground/40 transition-colors hover:bg-foreground/5 hover:text-red-500"
+            className="rounded-md px-1.5 py-0.5 text-xs text-[var(--color-text-faint)] transition-colors hover:bg-[var(--color-surface-2)] hover:text-[var(--color-error)]"
             aria-label="Remove image widget"
           >
             ✕
@@ -100,7 +100,7 @@ export function ImageWidget({ widget }: Props) {
           <button
             type="button"
             onClick={handleReplace}
-            className="flex flex-col items-center gap-2 text-foreground/40"
+            className="flex flex-col items-center gap-2 text-[var(--color-text-faint)]"
           >
             <svg className="size-8" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />

@@ -15,7 +15,7 @@ export function DashboardTabs() {
   const setActiveTab = useAppStore((s) => s.setActiveTab);
 
   return (
-    <div className="mb-6 flex gap-1 rounded-lg border border-foreground/10 bg-foreground/3 p-1">
+    <div className="mb-6 flex gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] p-1">
       {TABS.map((tab) => {
         const isActive = activeTab === tab.key;
         return (
@@ -25,8 +25,8 @@ export function DashboardTabs() {
             onClick={() => setActiveTab(tab.key)}
             className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
               isActive
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-foreground/50 hover:text-foreground/80'
+                ? 'bg-[var(--color-bg)] text-[var(--color-text)] shadow-sm'
+                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
             }`}
           >
             {tab.label}

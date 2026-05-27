@@ -20,12 +20,12 @@ export function TextWidget({ widget }: Props) {
   }, [widget.id, text, updateWidget]);
 
   return (
-    <div className="flex h-full flex-col rounded-xl border border-foreground/10 bg-background">
+    <div className="flex h-full flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
       {/* Drag handle */}
-      <div className="chart-drag-handle flex shrink-0 cursor-grab items-center justify-between gap-2 border-b border-foreground/5 px-3 py-2 active:cursor-grabbing">
+      <div className="chart-drag-handle flex shrink-0 cursor-grab items-center justify-between gap-2 border-b border-[var(--color-border)] px-3 py-2 active:cursor-grabbing">
         <div className="flex items-center gap-2">
           <svg
-            className="size-4 shrink-0 text-foreground/40"
+            className="no-print size-4 shrink-0 text-[var(--color-text-faint)]"
             viewBox="0 0 16 16"
             fill="currentColor"
             aria-hidden="true"
@@ -37,12 +37,12 @@ export function TextWidget({ widget }: Props) {
             <circle cx="4" cy="13" r="1.5" />
             <circle cx="12" cy="13" r="1.5" />
           </svg>
-          <span className="text-xs font-medium text-foreground/50">Text</span>
+          <span className="text-xs font-medium text-[var(--color-text-muted)]">Text</span>
         </div>
         <button
           type="button"
           onClick={() => removeWidget(widget.id)}
-          className="rounded-md px-1.5 py-0.5 text-xs text-foreground/40 transition-colors hover:bg-foreground/5 hover:text-red-500"
+          className="no-print rounded-md px-1.5 py-0.5 text-xs text-[var(--color-text-faint)] transition-colors hover:bg-[var(--color-surface-2)] hover:text-[var(--color-error)]"
           aria-label="Remove text widget"
         >
           ✕
@@ -56,7 +56,7 @@ export function TextWidget({ widget }: Props) {
         onChange={(e) => setText(e.target.value)}
         onBlur={handleBlur}
         placeholder="Click to edit text..."
-        className="h-full w-full min-h-0 flex-1 resize-none rounded-b-xl bg-transparent p-3 text-sm text-foreground outline-none placeholder:text-foreground/30"
+        className="h-full w-full min-h-0 flex-1 resize-none rounded-b-xl bg-transparent p-3 text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-faint)] focus:ring-1 focus:ring-[var(--color-accent)]"
       />
     </div>
   );

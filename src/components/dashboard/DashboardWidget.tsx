@@ -5,6 +5,7 @@ import React from 'react';
 import { ChartWidget } from '@/components/chart/ChartWidget';
 import { EmptySlotWidget } from '@/components/widgets/EmptySlotWidget';
 import { ImageWidget } from '@/components/widgets/ImageWidget';
+import { TableWidget } from '@/components/widgets/TableWidget';
 import { TextWidget } from '@/components/widgets/TextWidget';
 import type { DashboardWidget as DashboardWidgetType } from '@/types';
 
@@ -30,6 +31,7 @@ export const DashboardWidget = React.forwardRef<HTMLDivElement, DashboardWidgetP
         {widget.widgetType === 'chart' && <ChartWidget widget={widget} />}
         {widget.widgetType === 'text' && <TextWidget widget={widget} />}
         {widget.widgetType === 'image' && <ImageWidget widget={widget} />}
+        {widget.widgetType === 'table' && <TableWidget widget={widget} />}
         {(!widget.widgetType || widget.widgetType === 'empty') && (
           <EmptySlotWidget widgetId={widget.id} />
         )}

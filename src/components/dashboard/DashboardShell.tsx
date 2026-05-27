@@ -8,10 +8,8 @@ import { useAppStore } from '@/store/appStore';
 /**
  * DashboardShell — two-column layout for the dashboard.
  *
- * Desktop: CSS Grid with collapsible LeftPanel (360px ↔ 64px) + RightPanel (1fr)
+ * Desktop: CSS Grid with LeftPanel (360px) + RightPanel (1fr)
  * Mobile (<768px): Single column with LeftPanel as slide-in drawer
- *
- * Children are slotted into RightPanel's main content area.
  */
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -26,7 +24,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="grid h-screen overflow-hidden bg-background text-foreground transition-[grid-template-columns] duration-300"
+      className="grid h-screen overflow-hidden bg-[var(--color-bg)] text-[var(--color-text)] transition-[grid-template-columns] duration-300"
       style={{
         gridTemplateColumns: showLeftPanel
           ? collapsed ? '64px 1fr' : '360px 1fr'
@@ -35,7 +33,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     >
       {/* ── Desktop LeftPanel (Board tab only) ───────────── */}
       {showLeftPanel && (
-        <div className="hidden md:flex">
+        <div className="hidden md:flex h-full min-h-0">
           <LeftPanel
             collapsed={collapsed}
             onToggleCollapse={toggleCollapse}
@@ -55,7 +53,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             onClick={closeDrawer}
           />
           {/* Drawer panel */}
-          <div className="relative z-10 h-full w-[320px] animate-slide-in-left">
+          <div className="absolute left-0 top-0 z-10 h-full w-[320px] animate-slide-in-left">
             <LeftPanel
               collapsed={false}
               onToggleCollapse={closeDrawer}
@@ -72,3 +70,4 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+

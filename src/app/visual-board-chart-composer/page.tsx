@@ -71,10 +71,10 @@ export default function ChartComposerPage() {
   // ── Empty state: no CSV loaded ───────────────────────
   if (!csv) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background text-foreground">
-        <div className="flex size-16 items-center justify-center rounded-full bg-foreground/5">
+      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-[var(--color-bg)] text-[var(--color-text)]">
+        <div className="flex size-16 items-center justify-center rounded-full bg-[var(--color-surface-2)]">
           <svg
-            className="size-8 text-foreground/25"
+            className="size-8 text-[var(--color-text-faint)]"
             fill="none"
             viewBox="0 0 24 24"
             strokeWidth={1.5}
@@ -87,16 +87,16 @@ export default function ChartComposerPage() {
             />
           </svg>
         </div>
-        <p className="text-lg font-semibold text-foreground/70">
+        <p className="text-lg font-semibold text-[var(--color-text)]">
           Chưa có dữ liệu
         </p>
-        <p className="text-sm text-foreground/45">
+        <p className="text-sm text-[var(--color-text-muted)]">
           Hãy upload file CSV trước khi tạo biểu đồ
         </p>
         <button
           type="button"
           onClick={() => router.push('/dashboard')}
-          className="mt-2 rounded-lg bg-foreground/10 px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-foreground/15"
+          className="mt-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] px-5 py-2.5 text-sm font-medium text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-2)]"
         >
           Về Dashboard
         </button>
@@ -167,13 +167,13 @@ export default function ChartComposerPage() {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground">
+    <div className="flex h-screen flex-col bg-[var(--color-bg)] text-[var(--color-text)]">
       {/* ── Top bar ──────────────────────────────────────── */}
-      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-foreground/10 px-4">
+      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--color-border)] px-4">
         <button
           type="button"
           onClick={handleCancel}
-          className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-foreground/60 transition-colors hover:bg-foreground/5 hover:text-foreground"
+          className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]"
         >
           <svg
             className="size-4"
@@ -190,7 +190,7 @@ export default function ChartComposerPage() {
           </svg>
           Back
         </button>
-        <div className="h-5 w-px bg-foreground/10" />
+        <div className="h-5 w-px bg-[var(--color-border)]" />
         <h1 className="text-sm font-semibold">
           {isEditMode ? 'Edit Chart' : 'Chart Composer'}
         </h1>
@@ -199,7 +199,7 @@ export default function ChartComposerPage() {
       {/* ── Main content ─────────────────────────────────── */}
       <div className="flex min-h-0 flex-1">
         {/* Left sidebar: field list */}
-        <div className="w-60 shrink-0 overflow-y-auto border-r border-foreground/10 p-4">
+        <div className="w-60 shrink-0 overflow-y-auto border-r border-[var(--color-border)] p-4">
           <ComposerFieldList columns={csv.schema} />
         </div>
 
@@ -213,7 +213,7 @@ export default function ChartComposerPage() {
             />
 
             {/* Drop zones */}
-            <div className="flex flex-col gap-3 rounded-xl border border-foreground/10 bg-foreground/2 p-4">
+            <div className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
               <ComposerDropZone
                 label="X Axis"
                 field={xField}
@@ -238,7 +238,7 @@ export default function ChartComposerPage() {
             <div className="flex items-center gap-3">
               <label
                 htmlFor="composer-title"
-                className="w-20 shrink-0 text-right text-xs font-medium text-foreground/50"
+                className="w-20 shrink-0 text-right text-xs font-medium text-[var(--color-text-muted)]"
               >
                 Title
               </label>
@@ -252,7 +252,7 @@ export default function ChartComposerPage() {
                     ? `${yField.name} theo ${xField.name}`
                     : 'Chart title'
                 }
-                className="flex-1 rounded-lg border border-foreground/10 bg-background px-3 py-2 text-sm text-foreground placeholder:text-foreground/30"
+                className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-faint)] focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/30 outline-none"
               />
             </div>
 
@@ -263,8 +263,8 @@ export default function ChartComposerPage() {
       </div>
 
       {/* ── Bottom bar ───────────────────────────────────── */}
-      <div className="flex shrink-0 items-center justify-between border-t border-foreground/10 px-5 py-3">
-        <span className="text-xs text-foreground/40">
+      <div className="flex shrink-0 items-center justify-between border-t border-[var(--color-border)] px-5 py-3">
+        <span className="text-xs text-[var(--color-text-faint)]">
           Sheet1 · {csv.rowCount.toLocaleString()} rows · {csv.headers.length}{' '}
           cols
         </span>
@@ -273,7 +273,7 @@ export default function ChartComposerPage() {
           <button
             type="button"
             onClick={handleCancel}
-            className="rounded-lg border border-foreground/10 px-4 py-2 text-sm font-medium text-foreground/60 transition-colors hover:bg-foreground/5"
+            className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-2)]"
           >
             Cancel
           </button>
@@ -283,7 +283,7 @@ export default function ChartComposerPage() {
               type="button"
               disabled={!canSubmit}
               onClick={handleUpdateChart}
-              className="flex items-center gap-1.5 rounded-lg bg-[var(--color-primary,#4f98a3)] px-5 py-2 text-sm font-semibold text-white transition-opacity enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-5 py-2 text-sm font-semibold text-[var(--color-text)] transition-colors enabled:hover:bg-[var(--color-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Update Chart
               <svg
@@ -305,7 +305,7 @@ export default function ChartComposerPage() {
               type="button"
               disabled={!canSubmit}
               onClick={handleAddToBoard}
-              className="flex items-center gap-1.5 rounded-lg bg-[var(--color-primary,#4f98a3)] px-5 py-2 text-sm font-semibold text-white transition-opacity enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-5 py-2 text-sm font-semibold text-[var(--color-text)] transition-colors enabled:hover:bg-[var(--color-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add to Board
               <svg

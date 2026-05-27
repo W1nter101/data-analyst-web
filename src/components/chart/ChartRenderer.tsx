@@ -31,15 +31,13 @@ type ChartPoint = {
   y: number;
 };
 
-const PIE_COLORS = [
-  '#2563eb',
-  '#16a34a',
-  '#7c3aed',
-  '#ea580c',
-  '#db2777',
-  '#0891b2',
-  '#4f46e5',
-  '#ca8a04',
+const COLORS = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-6)',
 ];
 
 function toNumber(raw: string): number {
@@ -91,6 +89,7 @@ function buildChartData(
   xColumn: string,
   yColumn: string,
   schema: ParsedCSV['schema'],
+  sortOrder?: 'asc' | 'desc' | 'none',
 ): { data: ChartPoint[]; note?: string } {
   // Aggregate: group by xColumn, sum yColumn per group.
   const groups = new Map<string, number>();
@@ -117,14 +116,20 @@ function buildChartData(
     entries = entries.slice(0, 20);
     note = `Hiển thị top 20 trong số ${groups.size} mục (do có quá nhiều dữ liệu)`;
   } else {
-    if (xType === 'number') {
-      entries.sort((a, b) => Number(a[0]) - Number(b[0]));
-    } else if (xType === 'date') {
-      entries.sort((a, b) => {
-        const dateA = new Date(a[0]).getTime();
-        const dateB = new Date(b[0]).getTime();
-        return (Number.isNaN(dateA) ? 0 : dateA) - (Number.isNaN(dateB) ? 0 : dateB);
-      });
+    if (sortOrder === 'desc') {
+      entries.sort((a, b) => b[1] - a[1]);
+    } else if (sortOrder === 'asc') {
+      entries.sort((a, b) => a[1] - b[1]);
+    } else {
+      if (xType === 'number') {
+        entries.sort((a, b) => Number(a[0]) - Number(b[0]));
+      } else if (xType === 'date') {
+        entries.sort((a, b) => {
+          const dateA = new Date(a[0]).getTime();
+          const dateB = new Date(b[0]).getTime();
+          return (Number.isNaN(dateA) ? 0 : dateA) - (Number.isNaN(dateB) ? 0 : dateB);
+        });
+      }
     }
   }
 
@@ -134,7 +139,7 @@ function buildChartData(
 
 function MissingColumnsError() {
   return (
-    <div className="flex h-full min-h-[200px] w-full items-center justify-center rounded-xl border border-red-300 bg-red-50 px-4 text-center text-sm text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">
+    <div className="flex h-full min-h-[200px] w-full items-center justify-center rounded-xl border border-[var(--color-error)] bg-[var(--color-error)]/10 px-4 text-center text-sm text-[var(--color-error)]">
       Selected chart columns were not found in the current CSV data.
     </div>
   );
@@ -142,14 +147,14 @@ function MissingColumnsError() {
 
 function EmptyChartState() {
   return (
-    <div className="flex h-full min-h-[200px] w-full items-center justify-center rounded-xl border border-dashed border-black/15 bg-black/2 px-4 text-center text-sm text-foreground/70 dark:border-white/20 dark:bg-white/4">
+    <div className="flex h-full min-h-[200px] w-full items-center justify-center rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-2)] px-4 text-center text-sm text-[var(--color-text-muted)]">
       No chartable data for the selected columns.
     </div>
   );
 }
 
 export function ChartRenderer({ chartConfig, data }: ChartRendererProps) {
-  const { type, xColumn, yColumn } = chartConfig;
+  const { type, xColumn, yColumn, sortOrder } = chartConfig;
 
   const hasX = data.headers.includes(xColumn);
   const hasY = data.headers.includes(yColumn);
@@ -163,7 +168,7 @@ export function ChartRenderer({ chartConfig, data }: ChartRendererProps) {
       ? applyFilters(data.rows, chartConfig.filters)
       : data.rows;
 
-  const { data: chartData, note } = buildChartData(filteredRows, xColumn, yColumn, data.schema);
+  const { data: chartData, note } = buildChartData(filteredRows, xColumn, yColumn, data.schema, sortOrder);
   if (chartData.length === 0) {
     return <EmptyChartState />;
   }
@@ -175,24 +180,24 @@ export function ChartRenderer({ chartConfig, data }: ChartRendererProps) {
   const isStringX = xType === 'string' || xType === 'category';
 
   const xAxisProps = isStringX
-    ? { interval: 0, angle: -35, textAnchor: 'end' as const, height: 60, tick: { fontSize: 11 } }
-    : { interval: 'preserveStartEnd' as const };
+    ? { interval: 0, angle: -35, textAnchor: 'end' as const, height: 60, tick: { fontSize: 11, fill: 'var(--color-text-muted)' } }
+    : { interval: 'preserveStartEnd' as const, tick: { fontSize: 11, fill: 'var(--color-text-muted)' } };
 
   const tooltipStyle = {
-    backgroundColor: '#1f2937',
-    color: '#f9fafb',
-    border: '1px solid #374151',
+    backgroundColor: 'var(--color-surface)',
+    color: 'var(--color-text)',
+    border: '1px solid var(--color-border)',
     borderRadius: '0.5rem',
   };
   
   const tooltipItemStyle = {
-    color: '#f9fafb',
+    color: 'var(--color-text)',
   };
 
   return (
-    <div className="flex h-full w-full flex-col rounded-xl border border-black/10 bg-background p-2 dark:border-white/15">
+    <div className="flex h-full w-full flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
       {note && (
-        <div className="mb-2 text-center text-xs text-amber-600 dark:text-amber-400">
+        <div className="mb-2 text-center text-xs text-[var(--color-warning)]">
           {note}
         </div>
       )}
@@ -200,39 +205,43 @@ export function ChartRenderer({ chartConfig, data }: ChartRendererProps) {
         <ResponsiveContainer width="100%" height="100%">
         {type === 'bar' ? (
           <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="x" />
-            <YAxis tickFormatter={yTickFormatter} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+            <XAxis dataKey="x" tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} />
+            <YAxis tickFormatter={yTickFormatter} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} />
             <Tooltip 
               formatter={(value) => Number(value).toLocaleString()} 
               contentStyle={tooltipStyle}
               itemStyle={tooltipItemStyle}
             />
-            <Bar dataKey="y" fill="#2563eb" />
+            <Bar dataKey="y" fill="var(--chart-1)">
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Bar>
           </BarChart>
         ) : type === 'line' ? (
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
             <XAxis dataKey="x" {...xAxisProps} />
-            <YAxis tickFormatter={yTickFormatter} />
+            <YAxis tickFormatter={yTickFormatter} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} />
             <Tooltip 
               formatter={(value) => Number(value).toLocaleString()} 
               contentStyle={tooltipStyle}
               itemStyle={tooltipItemStyle}
             />
-            <Line type="monotone" dataKey="y" stroke="#7c3aed" dot={false} />
+            <Line type="monotone" dataKey="y" stroke="var(--chart-1)" dot={false} />
           </LineChart>
         ) : type === 'area' ? (
           <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 60 }}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
             <XAxis dataKey="x" {...xAxisProps} />
-            <YAxis tickFormatter={yTickFormatter} />
+            <YAxis tickFormatter={yTickFormatter} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} />
             <Tooltip 
               formatter={(value) => Number(value).toLocaleString()} 
               contentStyle={tooltipStyle}
               itemStyle={tooltipItemStyle}
             />
-            <Area type="monotone" dataKey="y" stroke="#16a34a" fill="#16a34a" fillOpacity={0.25} />
+            <Area type="monotone" dataKey="y" stroke="var(--chart-2)" fill="var(--chart-2)" fillOpacity={0.25} />
           </AreaChart>
         ) : type === 'pie' ? (
           <PieChart>
@@ -243,21 +252,25 @@ export function ChartRenderer({ chartConfig, data }: ChartRendererProps) {
             />
             <Pie data={chartData} dataKey="y" nameKey="x" cx="50%" cy="50%" outerRadius={100}>
               {chartData.map((entry, index) => (
-                <Cell key={`${entry.x}-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                <Cell key={`${entry.x}-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
           </PieChart>
         ) : (
           <ScatterChart>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="x" type="category" name={xColumn} />
-            <YAxis dataKey="y" tickFormatter={yTickFormatter} name={yColumn} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+            <XAxis dataKey="x" type="category" name={xColumn} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} />
+            <YAxis dataKey="y" tickFormatter={yTickFormatter} name={yColumn} tick={{ fontSize: 11, fill: 'var(--color-text-muted)' }} />
             <Tooltip 
               formatter={(value) => Number(value).toLocaleString()} 
               contentStyle={tooltipStyle}
               itemStyle={tooltipItemStyle}
             />
-            <Scatter data={chartData} fill="#ea580c" />
+            <Scatter data={chartData} fill="var(--chart-6)">
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Scatter>
           </ScatterChart>
         )}
       </ResponsiveContainer>

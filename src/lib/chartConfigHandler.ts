@@ -23,6 +23,7 @@ export interface AIChartConfig {
     group_by?: string;
   };
   color_by?: string;
+  sort?: 'asc' | 'desc' | 'none';
 }
 
 /**
@@ -70,6 +71,15 @@ function getKeywordOverride(userQuery: string): ChartType | null {
     }
   }
   return null;
+}
+
+function getSortOverride(userQuery: string): 'asc' | 'desc' | 'none' {
+  const lower = userQuery.toLowerCase();
+  const descKeywords = ['cao xuống', 'lớn nhất trước', 'giảm dần', 'descending', 'từ trên xuống'];
+  const ascKeywords = ['thấp lên', 'nhỏ nhất trước', 'tăng dần', 'ascending', 'từ dưới lên'];
+  if (descKeywords.some(k => lower.includes(k))) return 'desc';
+  if (ascKeywords.some(k => lower.includes(k))) return 'asc';
+  return 'none';
 }
 
 // ── Result type ───────────────────────────────────────────────────
@@ -156,6 +166,7 @@ export function applyChartConfig(
 
   const chartId = uuidv4();
   const title = aiConfig.title ?? `${aiConfig.y_axis} theo ${aiConfig.x_axis}`;
+  const sortOrder = getSortOverride(userQuery ?? '') || aiConfig.sort || 'none';
 
   // Add chart via existing appStore API
   store.addChart({
@@ -166,6 +177,7 @@ export function applyChartConfig(
     yColumn: aiConfig.y_axis,
     colorColumn: aiConfig.color_by,
     filters: aiConfig.filters,
+    sortOrder,
   });
 
   // Add dashboard widget below all existing ones

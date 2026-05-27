@@ -39,7 +39,7 @@ export function ComposerDropZone({ label, field, onDrop, onRemove }: Props) {
 
   return (
     <div className="flex items-center gap-3">
-      <span className="w-20 shrink-0 text-right text-xs font-medium text-foreground/50">
+      <span className="w-20 shrink-0 text-right text-xs font-medium text-[var(--color-text-muted)]">
         {label}
       </span>
       <div
@@ -48,31 +48,31 @@ export function ComposerDropZone({ label, field, onDrop, onRemove }: Props) {
         onDrop={handleDrop}
         className={`flex min-h-[40px] flex-1 items-center rounded-lg border-2 border-dashed px-3 py-1.5 transition-colors ${
           dragOver
-            ? 'border-[var(--color-primary,#4f98a3)] bg-[var(--color-primary,#4f98a3)]/8'
+            ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/10'
             : field
-              ? 'border-foreground/15 bg-foreground/3'
-              : 'border-foreground/10 bg-transparent'
+              ? 'border-[var(--color-border)] bg-[var(--color-surface)]'
+              : 'border-[var(--color-border)] bg-transparent'
         }`}
       >
         {field ? (
           <div className="flex items-center gap-2">
-            <span className="flex size-5 shrink-0 items-center justify-center rounded bg-foreground/10 text-[10px] font-semibold text-foreground/50">
+            <span className="flex size-5 shrink-0 items-center justify-center rounded bg-[var(--color-surface-2)] text-[10px] font-semibold text-[var(--color-text-muted)]">
               {typeIcon(field.type)}
             </span>
-            <span className="text-sm font-medium text-foreground">
+            <span className="text-sm font-medium text-[var(--color-text)]">
               {field.name}
             </span>
             <button
               type="button"
               onClick={onRemove}
-              className="ml-1 flex size-5 items-center justify-center rounded-full text-foreground/35 transition-colors hover:bg-foreground/10 hover:text-foreground/70"
+              className="ml-1 flex size-5 items-center justify-center rounded-full text-[var(--color-text-faint)] transition-colors hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text)]"
               aria-label={`Remove ${field.name}`}
             >
               ×
             </button>
           </div>
         ) : (
-          <span className="text-xs text-foreground/30">
+          <span className="text-xs text-[var(--color-text-faint)]">
             {dragOver ? 'Thả trường vào đây' : 'Kéo trường vào đây'}
           </span>
         )}

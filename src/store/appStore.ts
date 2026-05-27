@@ -24,7 +24,33 @@ function ensureEmptySlot(widgets: DashboardWidget[]): DashboardWidget[] {
   ];
 }
 
+export interface FileItem {
+  id: string;
+  original_name: string;
+  row_count: number;
+  column_names: string[];
+  created_at: number;
+}
+
+export interface ConvItem {
+  id: string;
+  title: string;
+  file_id: string;
+  file_name: string;
+  message_count: number;
+  updated_at: number;
+}
+
 export interface AppStoreState {
+  currentFileId: string | null;
+  currentConversationId: string | null;
+  fileList: FileItem[];
+  conversationList: ConvItem[];
+  setCurrentFileId: (id: string | null) => void;
+  setCurrentConversationId: (id: string | null) => void;
+  setFileList: (files: FileItem[]) => void;
+  setConversationList: (convs: ConvItem[]) => void;
+
   csv: ParsedCSV | null;
   charts: ChartConfig[];
   dashboardWidgets: DashboardWidget[];
@@ -34,9 +60,14 @@ export interface AppStoreState {
   focusedWidgetId: string | null;
   editingChartId: string | null;
   pendingChartSlotId: string | null;
+  refreshTrigger: number;
+  triggerRefresh: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dataTabRows: Record<string, any>[];
   setCSV: (csv: ParsedCSV | null) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setDataTabRows: (rows: Record<string, any>[]) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   appendDataTabRows: (rows: Record<string, any>[]) => void;
   updateDataTabRow: (rowId: number, column: string, value: string) => void;
   setLoading: (loading: boolean) => void;
@@ -59,6 +90,15 @@ export interface AppStoreState {
 export const useAppStore = create<AppStoreState>()(
   persist(
     (set) => ({
+      currentFileId: null,
+      currentConversationId: null,
+      fileList: [],
+      conversationList: [],
+      setCurrentFileId: (currentFileId) => set({ currentFileId }),
+      setCurrentConversationId: (currentConversationId) => set({ currentConversationId }),
+      setFileList: (fileList) => set({ fileList }),
+      setConversationList: (conversationList) => set({ conversationList }),
+
       csv: null,
       charts: [],
       dashboardWidgets: ensureEmptySlot([]),
@@ -68,6 +108,8 @@ export const useAppStore = create<AppStoreState>()(
       focusedWidgetId: null,
       editingChartId: null,
       pendingChartSlotId: null,
+      refreshTrigger: 0,
+      triggerRefresh: () => set((state) => ({ refreshTrigger: state.refreshTrigger + 1 })),
       dataTabRows: [],
       setCSV: (csv) => set({ csv }),
       setDataTabRows: (dataTabRows) => set({ dataTabRows }),
@@ -82,7 +124,7 @@ export const useAppStore = create<AppStoreState>()(
           }
           
           // Also try to update csv.rows if we can, to keep charts somewhat in sync
-          let newCsv = state.csv;
+          const newCsv = state.csv;
           if (state.csv) {
             // Since we cannot assume rowid = index + 1, we must find the row by matching.
             // However, since rowid isn't in csv.rows, we just do our best or leave it.
@@ -144,6 +186,8 @@ export const useAppStore = create<AppStoreState>()(
         csv: state.csv,
         charts: state.charts,
         dashboardWidgets: state.dashboardWidgets,
+        currentFileId: state.currentFileId,
+        currentConversationId: state.currentConversationId,
       }),
       // Migration: treat missing widgetType as 'chart'
       merge: (persisted, current) => {

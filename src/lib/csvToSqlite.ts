@@ -1,24 +1,24 @@
+import Database from 'better-sqlite3';
 import Papa from 'papaparse';
 
-import { getDb } from './db';
-
-export function importCsvToSqlite(csvString: string, tableName = 'data'): void {
-  const db = getDb();
+export function importCsvToSqlite(csvString: string, tableName = 'data'): { buffer: Buffer, rowCount: number, columns: string[] } {
+  const db = new Database(':memory:');
   const parsed = Papa.parse(csvString, { header: true, skipEmptyLines: true });
   const rows = parsed.data as Record<string, string>[];
 
-  if (rows.length === 0) return;
+  if (rows.length === 0) {
+    const buffer = db.serialize();
+    db.close();
+    return { buffer, rowCount: 0, columns: [] };
+  }
 
   const columns = Object.keys(rows[0]);
 
-  // Drop and recreate table
   db.exec(`DROP TABLE IF EXISTS "${tableName}"`);
 
-  // Create table — all columns as TEXT first, SQLite handles casting in queries
   const colDefs = columns.map((c) => `"${c}" TEXT`).join(', ');
   db.exec(`CREATE TABLE "${tableName}" (${colDefs})`);
 
-  // Bulk insert
   const placeholders = columns.map(() => '?').join(', ');
   const colNames = columns.map((c) => `"${c}"`).join(', ');
   const insert = db.prepare(
@@ -32,13 +32,22 @@ export function importCsvToSqlite(csvString: string, tableName = 'data'): void {
   });
 
   insertMany(rows);
+
+  db.exec(`DROP TABLE IF EXISTS "${tableName}_original"`);
+  db.exec(`CREATE TABLE "${tableName}_original" AS SELECT * FROM "${tableName}"`);
+
+  const buffer = db.serialize();
+  db.close();
+
+  return { buffer, rowCount: rows.length, columns };
 }
 
-export function getTableSchema(tableName = 'data'): string {
-  const db = getDb();
+export function getTableSchema(dbPath: string, tableName = 'data'): string {
+  const db = new Database(dbPath, { readonly: true });
   const cols = db.prepare(`PRAGMA table_info("${tableName}")`).all() as {
     name: string;
     type: string;
   }[];
+  db.close();
   return cols.map((c) => `${c.name} (${c.type})`).join(', ');
 }

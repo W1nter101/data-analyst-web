@@ -74,10 +74,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   // While initializing, show spinner — NEVER render children
   if (initializing) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg)]">
         <div className="flex flex-col items-center gap-4">
-          <div className="size-8 animate-spin rounded-full border-4 border-foreground/20 border-t-foreground/70" />
-          <p className="text-sm text-foreground/60">Đang tải trang...</p>
+          <div className="size-8 animate-spin rounded-full border-4 border-[var(--color-surface-2)] border-t-[var(--color-accent)]" />
+          <p className="text-sm text-[var(--color-text-faint)]">Đang tải trang...</p>
         </div>
       </div>
     );
