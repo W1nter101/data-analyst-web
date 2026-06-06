@@ -5,6 +5,7 @@ import { storage } from '@/lib/storage';
 import appDb from '@/lib/appDb';
 
 export async function GET(req: NextRequest) {
+  let db: Database.Database | null = null;
   try {
     const session = await getSession(req);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
     if (!file) return NextResponse.json({ error: 'File not found' }, { status: 404 });
 
     const dbPath = storage.getPath(session.userId, fileId);
-    const db = new Database(dbPath);
+    db = new Database(dbPath);
     
     // Ensure original table exists for backward compatibility
     const originalExists = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='data_original'`).get();
@@ -34,10 +35,13 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('GET /api/data Error:', error);
     return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 });
+  } finally {
+    if (db) db.close();
   }
 }
 
 export async function PATCH(req: NextRequest) {
+  let db: Database.Database | null = null;
   try {
     const session = await getSession(req);
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -52,7 +56,7 @@ export async function PATCH(req: NextRequest) {
     if (!file) return NextResponse.json({ error: 'File not found' }, { status: 404 });
 
     const dbPath = storage.getPath(session.userId, fileId);
-    const db = new Database(dbPath);
+    db = new Database(dbPath);
     
     // Ensure original table exists for backward compatibility
     const originalExists = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='data_original'`).get();
@@ -77,5 +81,7 @@ export async function PATCH(req: NextRequest) {
   } catch (error) {
     console.error('PATCH /api/data Error:', error);
     return NextResponse.json({ error: 'Failed to update database' }, { status: 500 });
+  } finally {
+    if (db) db.close();
   }
 }

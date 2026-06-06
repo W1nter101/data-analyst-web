@@ -189,8 +189,7 @@ function isValidResponse(obj: Record<string, unknown>): boolean {
     const config = ac as Record<string, unknown>;
     return (
       typeof config.operation === 'string' &&
-      typeof config.metric === 'string' &&
-      typeof config.aggregation === 'string'
+      typeof config.metric === 'string'
     );
   }
 
