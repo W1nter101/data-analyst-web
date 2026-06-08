@@ -86,6 +86,37 @@ Operation rules:
 - summary: totals across all data → no filters, no limit
 - trend: over time → group_by = date/time column
 
+## Intent: "key_influencers"
+When user wants to know which columns/factors INFLUENCE or CORRELATE WITH a specific column.
+This is about statistical correlation (Pearson/Spearman), NOT about aggregation or GROUP BY.
+
+DISTINGUISH FROM "analyze":
+- "analyze" → aggregation, GROUP BY, TOP N values, SUM/AVG/COUNT
+- "key_influencers" → correlation between columns, what drives/affects a metric
+
+Trigger keywords (Vietnamese + English):
+  "yếu tố nào ảnh hưởng", "cột nào tác động", "nguyên nhân của",
+  "ảnh hưởng đến", "tác động đến", "quan trọng nhất đến",
+  "yếu tố nào quyết định", "cái gì ảnh hưởng", "điều gì tác động",
+  "key influencers", "key factors", "what drives", "what affects",
+  "what influences", "what impacts", "correlation with",
+  "factors affecting", "drivers of"
+
+Output JSON:
+{
+  "intent": "key_influencers",
+  "targetColumn": "<exact column name from available_columns>"
+}
+
+Examples:
+- "yếu tố nào ảnh hưởng đến Profit?" → { "intent": "key_influencers", "targetColumn": "Profit" }
+- "cột nào tác động đến Units Sold?" → { "intent": "key_influencers", "targetColumn": "Units Sold" }
+- "what drives Revenue?" → { "intent": "key_influencers", "targetColumn": "Revenue" }
+- "doanh thu trung bình theo quốc gia?" → { "intent": "analyze" } ← aggregation, NOT correlation
+- "top 5 sản phẩm bán chạy nhất?" → { "intent": "analyze" } ← ranking, NOT correlation
+IMPORTANT: targetColumn must be an exact column name from the available_columns.
+IMPORTANT: When user asks "yếu tố nào ảnh hưởng đến X", ALWAYS use key_influencers, NEVER analyze.
+
 ## Intent: "unknown"
 When query is not about data:
 { "intent": "unknown", "message": "Tôi chỉ có thể giúp phân tích dữ liệu CSV." }
@@ -127,7 +158,7 @@ async function callLMStudio(
     schema,
     user_query: userQuery,
     available_columns: columnList,
-    instruction: `Use ONLY column names from available_columns for x_axis, y_axis, filters.column, aggregation.group_by, and color_by.`,
+    instruction: `Use ONLY column names from available_columns for x_axis, y_axis, filters.column, aggregation.group_by, color_by, and targetColumn.`,
   });
 
   const res = await fetch(`${LM_STUDIO_BASE_URL}/chat/completions`, {
@@ -203,10 +234,15 @@ function isValidResponse(obj: Record<string, unknown>): boolean {
     );
   }
 
+  // Key Influencers — structure-only check;
+  // column existence is validated in the API route via PRAGMA table_info
+  if (obj.intent === 'key_influencers') {
+    return typeof obj.targetColumn === 'string' && obj.targetColumn.length > 0;
+  }
+
   return false;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildSqlFromChartConfig(cc: Record<string, unknown>, tableName = "data"): string {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const aggFn = (cc.aggregation as any)?.function?.toUpperCase() ?? "SUM";
@@ -330,6 +366,80 @@ export type ChatJobResult = Record<string, any>;
 export async function processChat(input: ChatJobInput): Promise<ChatJobResult> {
   const { schema, user_query, conversationId, dbPath, columnList } = input;
 
+  // ─── KEY INFLUENCERS REGEX BYPASS ──────────────────────────────────
+  // phi-3-mini can't reliably classify this intent via SYSTEM_PROMPT.
+  // Regex detect at server level — no LLM call needed.
+  const KEY_INFLUENCER_REGEX =
+    /yếu tố nào|yếu tố.*ảnh hưởng|cột nào.*ảnh hưởng|cột nào.*tác động|ảnh hưởng (?:nhiều nhất |chính |lớn nhất )?đến|tác động (?:nhiều nhất |chính |lớn nhất )?đến|quan trọng nhất.*đến|nguyên nhân.*của|what drives|what affects|what influences|what impacts|key factor|key influencer/i;
+
+  if (KEY_INFLUENCER_REGEX.test(user_query)) {
+    // Extract targetColumn from query: "đến <column>" or "to/of <column>"
+    const colPatterns = [
+      /(?:đến|to)\s+["\u2018\u2019\u201c\u201d]?([^?.,\n"]+?)["\u2018\u2019\u201c\u201d]?\s*(?:\?|$)/i,
+      /(?:của|of)\s+["\u2018\u2019\u201c\u201d]?([^?.,\n"]+?)["\u2018\u2019\u201c\u201d]?\s*(?:\?|$)/i,
+    ];
+
+    let targetColumn: string | null = null;
+
+    for (const pattern of colPatterns) {
+      const match = user_query.match(pattern);
+      if (match?.[1]) {
+        const candidate = match[1].trim();
+        // Exact match (case-insensitive) against columnList
+        const found = columnList.find(
+          c => c.toLowerCase() === candidate.toLowerCase(),
+        );
+        if (found) {
+          targetColumn = found;
+          break;
+        }
+        // Partial match: "units sold" matches "Units Sold"
+        const partial = columnList.find(c =>
+          c.toLowerCase().includes(candidate.toLowerCase()) ||
+          candidate.toLowerCase().includes(c.toLowerCase()),
+        );
+        if (partial) {
+          targetColumn = partial;
+          break;
+        }
+      }
+    }
+
+    // Fallback: find any numeric column mentioned in the query
+    if (!targetColumn) {
+      const schemaArr = schema as Array<{ column_name: string; data_type: string }>;
+      if (Array.isArray(schemaArr)) {
+        const numericCols = schemaArr.filter(c =>
+          c.data_type === 'number' || c.data_type === 'REAL' || c.data_type === 'INTEGER',
+        );
+        for (const col of numericCols) {
+          if (user_query.toLowerCase().includes(col.column_name.toLowerCase())) {
+            targetColumn = col.column_name;
+            break;
+          }
+        }
+      }
+    }
+
+    if (targetColumn) {
+      console.log(`[KEY_INFLUENCERS REGEX] Bypassed LLM → targetColumn: "${targetColumn}"`);
+      if (conversationId) {
+        saveUserMessage(conversationId, user_query);
+        saveAssistantMessage(
+          conversationId,
+          `Key Influencers: ${targetColumn}`,
+          'key_influencers',
+        );
+      }
+      return {
+        intent: 'key_influencers' as const,
+        targetColumn,
+      };
+    }
+    // If regex matched but no column found → fall through to normal LLM flow
+  }
+  // ───────────────────────────────────────────────────────────────────
+
   // ── Call LM Studio (with 1 retry) ───────────────────────────────
   let result = await callLMStudio(schema, user_query, columnList);
   if (!result) {
@@ -353,6 +463,23 @@ export async function processChat(input: ChatJobInput): Promise<ChatJobResult> {
       saveAssistantMessage(conversationId, message, 'unknown');
     }
     return { intent: 'unknown', message };
+  }
+
+  // ── Key Influencers intent ──────────────────────────────────────
+  if (result.intent === 'key_influencers') {
+    // Persist to conversation history — consistent with other intents
+    if (conversationId) {
+      saveUserMessage(conversationId, user_query);
+      saveAssistantMessage(
+        conversationId,
+        `Key Influencers: ${result.targetColumn}`,
+        'key_influencers',
+      );
+    }
+    return {
+      intent: 'key_influencers',
+      targetColumn: result.targetColumn,
+    };
   }
 
   // ── Transform intent ────────────────────────────────────────────

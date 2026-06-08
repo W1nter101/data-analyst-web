@@ -8,6 +8,10 @@ import { applyChartConfig, type AIChartConfig } from '@/lib/chartConfigHandler';
 import { ConversationSidebar } from '@/components/dashboard/ConversationSidebar';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import {
+  KeyInfluencersChart,
+  type InfluencerResult,
+} from '@/components/chart/KeyInfluencersChart';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -27,6 +31,11 @@ interface ChatMessage {
     new_name?: string;
     data_type?: string;
     description?: string;
+  };
+  influencerData?: {
+    results: InfluencerResult[];
+    targetColumn: string;
+    rowCount: number;
   };
 }
 
@@ -368,6 +377,9 @@ export function LeftPanel({
       `Vẽ biểu đồ đường ${y} theo ${x}`,
       `So sánh ${y} giữa các ${x}`,
       `Tỷ lệ ${y} theo ${x}`,
+      ...(csv.schema.filter(c => c.type === 'number').length >= 2
+        ? [`Yếu tố nào ảnh hưởng nhiều nhất đến ${csv.schema.filter(c => c.type === 'number').at(-1)?.name}?`]
+        : []),
     ];
   }, [csv]);
 
@@ -490,6 +502,53 @@ export function LeftPanel({
               content: config.description || 'Yêu cầu thay đổi dữ liệu cột.',
               isPending: true,
               transformConfig: config,
+            },
+          ]);
+          return;
+        }
+
+        // Handle key_influencers intent
+        if (data.intent === 'key_influencers') {
+          const accessToken = useAuthStore.getState().accessToken;
+          const insightRes = await fetch('/api/insights/key-influencers', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+            },
+            body: JSON.stringify({
+              fileId: currentFileId,
+              targetColumn: data.targetColumn,
+            }),
+          });
+
+          const insightData = await insightRes.json();
+
+          if (!insightRes.ok || insightData.error || !insightData.results) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `err-${Date.now()}`,
+                role: 'assistant',
+                content: insightData.error ?? `Không thể phân tích cột "${data.targetColumn}".`,
+                isError: true,
+              },
+            ]);
+            return;
+          }
+
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `ai-${Date.now()}`,
+              role: 'assistant',
+              content: `Đã phân tích ${insightData.rowCount.toLocaleString()} hàng dữ liệu.`,
+              isError: false,
+              influencerData: {
+                results: insightData.results,
+                targetColumn: data.targetColumn as string,
+                rowCount: insightData.rowCount as number,
+              },
             },
           ]);
           return;
@@ -875,6 +934,13 @@ export function LeftPanel({
                               ❌ Huỷ
                             </button>
                           </div>
+                        )}
+                        {msg.influencerData && (
+                          <KeyInfluencersChart
+                            results={msg.influencerData.results}
+                            targetColumn={msg.influencerData.targetColumn}
+                            rowCount={msg.influencerData.rowCount}
+                          />
                         )}
                       </div>
                     </div>
