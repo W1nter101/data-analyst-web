@@ -7,6 +7,7 @@ import { EmptySlotWidget } from '@/components/widgets/EmptySlotWidget';
 import { ImageWidget } from '@/components/widgets/ImageWidget';
 import { TableWidget } from '@/components/widgets/TableWidget';
 import { TextWidget } from '@/components/widgets/TextWidget';
+import { ForecastChart } from '@/components/chart/ForecastChart';
 import type { DashboardWidget as DashboardWidgetType } from '@/types';
 
 type DashboardWidgetProps = {
@@ -32,6 +33,11 @@ export const DashboardWidget = React.forwardRef<HTMLDivElement, DashboardWidgetP
         {widget.widgetType === 'text' && <TextWidget widget={widget} />}
         {widget.widgetType === 'image' && <ImageWidget widget={widget} />}
         {widget.widgetType === 'table' && <TableWidget widget={widget} />}
+        {widget.widgetType === 'forecast' && widget.forecastResult && (
+          <div className="h-full w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+            <ForecastChart result={widget.forecastResult} widgetId={widget.id} />
+          </div>
+        )}
         {(!widget.widgetType || widget.widgetType === 'empty') && (
           <EmptySlotWidget widgetId={widget.id} />
         )}
@@ -40,3 +46,4 @@ export const DashboardWidget = React.forwardRef<HTMLDivElement, DashboardWidgetP
     );
   },
 );
+

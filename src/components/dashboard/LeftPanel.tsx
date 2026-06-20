@@ -12,6 +12,8 @@ import {
   KeyInfluencersChart,
   type InfluencerResult,
 } from '@/components/chart/KeyInfluencersChart';
+import { ForecastSummaryCard } from '@/components/chart/ForecastSummaryCard';
+import type { ForecastResult } from '@/lib/forecast';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -37,6 +39,7 @@ interface ChatMessage {
     targetColumn: string;
     rowCount: number;
   };
+  forecastResult?: ForecastResult;
 }
 
 interface LeftPanelProps {
@@ -249,7 +252,7 @@ export function LeftPanel({
  
   // ── Handle applying transform ─────────────────────────────────────
   const handleApplyTransform = useCallback(
-    async (messageId: string, transformConfig: any) => {
+    async (messageId: string, transformConfig: ChatMessage['transformConfig']) => {
       if (!currentFileId) return;
       const accessToken = useAuthStore.getState().accessToken;
  
@@ -289,7 +292,7 @@ export function LeftPanel({
             const fileData = await fileRes.json();
             if (fileData.success) {
               useAppStore.getState().setCSV({
-                headers: fileData.file.schema.map((s: any) => s.name),
+                headers: fileData.file.schema.map((s: { name: string }) => s.name),
                 rowCount: fileData.file.row_count,
                 schema: fileData.file.schema,
                 rows: [],
@@ -379,6 +382,9 @@ export function LeftPanel({
       `Tỷ lệ ${y} theo ${x}`,
       ...(csv.schema.filter(c => c.type === 'number').length >= 2
         ? [`Yếu tố nào ảnh hưởng nhiều nhất đến ${csv.schema.filter(c => c.type === 'number').at(-1)?.name}?`]
+        : []),
+      ...(csv.schema.some(c => c.type === 'date')
+        ? [`Dự báo ${yCandidate.name} 3 tháng tới`]
         : []),
     ];
   }, [csv]);
@@ -493,7 +499,7 @@ export function LeftPanel({
  
         // Handle transform intent
         if (data.intent === 'transform' && data.transform_config) {
-          const config = data.transform_config as any;
+          const config = data.transform_config as Exclude<ChatMessage['transformConfig'], undefined>;
           setMessages((prev) => [
             ...prev,
             {
@@ -549,6 +555,55 @@ export function LeftPanel({
                 targetColumn: data.targetColumn as string,
                 rowCount: insightData.rowCount as number,
               },
+            },
+          ]);
+          return;
+        }
+
+        // Handle forecast intent
+        if (data.intent === 'forecast') {
+          const accessToken = useAuthStore.getState().accessToken;
+          const forecastRes = await fetch('/api/forecast', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+            },
+            body: JSON.stringify({
+              fileId: currentFileId,
+              dateColumn: data.dateColumn,
+              valueColumn: data.valueColumn,
+              horizon: data.horizon,
+            }),
+          });
+
+          const forecastData = await forecastRes.json();
+
+          if (!forecastRes.ok || forecastData.error) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `err-${Date.now()}`,
+                role: 'assistant',
+                content: forecastData.error ?? 'Không thể tạo dự báo',
+                isError: true,
+              },
+            ]);
+            return;
+          }
+
+          // Add forecast widget to dashboard
+          const store = useAppStore.getState();
+          store.addForecastWidget(forecastData as ForecastResult);
+
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `ai-${Date.now()}`,
+              role: 'assistant',
+              content: '__FORECAST__',
+              forecastResult: forecastData as ForecastResult,
+              isError: false,
             },
           ]);
           return;
@@ -913,9 +968,13 @@ export function LeftPanel({
                           <span className="mr-1">❌</span>
                         )}
                         <div className="[&>table]:w-full [&>table]:border-collapse [&_th]:border [&_th]:border-[var(--color-border)] [&_th]:px-2 [&_th]:py-1 [&_td]:border [&_td]:border-[var(--color-border)] [&_td]:px-2 [&_td]:py-1 [&_p]:my-1 overflow-x-auto whitespace-normal">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {msg.content}
-                          </ReactMarkdown>
+                          {msg.content === '__FORECAST__' && msg.forecastResult ? (
+                            <ForecastSummaryCard result={msg.forecastResult} />
+                          ) : (
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {msg.content}
+                            </ReactMarkdown>
+                          )}
                         </div>
                         {msg.isPending && msg.transformConfig && (
                           <div className="mt-3 flex items-center gap-2 border-t border-purple-500/20 pt-2.5">

@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const LM_STUDIO_BASE_URL =
-  process.env.LM_STUDIO_BASE_URL || 'http://localhost:1234/v1';
-const LM_STUDIO_MODEL =
-  process.env.LM_STUDIO_MODEL || 'sql-phi3';
-
 const NARRATIVE_SYSTEM_PROMPT = `You are a data analyst assistant.
 You will receive pre-calculated numbers from a trusted calculation engine.
 Your ONLY job: write ONE short, professional insight (2-3 sentences max) 
@@ -31,11 +26,14 @@ export async function POST(req: NextRequest) {
 
     const userPrompt = `User's original question: "${user_query}"\n\nQuery results:\n${markdownTable}\n\nWrite a concise professional insight based on the numbers above.`;
 
-    const response = await fetch(`${LM_STUDIO_BASE_URL}/chat/completions`, {
+    const baseUrl = process.env.LM_STUDIO_BASE_URL || 'http://localhost:1234/v1';
+    const model = process.env.LM_STUDIO_MODEL || 'qwen2.5-coder-7b-instruct';
+
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: LM_STUDIO_MODEL,
+        model,
         messages: [
           { role: 'system', content: NARRATIVE_SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },

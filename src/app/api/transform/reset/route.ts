@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     // Recalculate columns and rows
     const newCols = db.prepare(`PRAGMA table_info("data")`).all() as { name: string; type: string }[];
     const headers = newCols.map((c) => c.name);
-    const rows = db.prepare(`SELECT * FROM "data"`).all() as Record<string, any>[];
+    const rows = db.prepare(`SELECT * FROM "data"`).all() as Record<string, unknown>[];
     db.close();
 
     // Convert all row values to string to prevent "raw.trim is not a function" in schema.ts

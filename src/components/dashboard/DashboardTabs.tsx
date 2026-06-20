@@ -5,6 +5,7 @@ import { useAppStore, type DashboardTab } from '@/store/appStore';
 const TABS: { key: DashboardTab; label: string }[] = [
   { key: 'board', label: 'Board' },
   { key: 'data', label: 'Data' },
+  { key: 'notebook', label: 'Notebook' },
 ];
 
 /**

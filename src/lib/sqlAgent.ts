@@ -1,9 +1,9 @@
 import { getTableSchema } from './csvToSqlite';
 import Database from 'better-sqlite3';
 
-const LM_STUDIO_BASE_URL =
-  process.env.LM_STUDIO_BASE_URL ?? 'http://localhost:1234/v1';
-const MODEL = process.env.LM_STUDIO_MODEL ?? 'sql-phi3';
+// IMPORTANT: Read env vars at call time, NOT at module load time.
+// ES import hoisting in chatWorker.ts causes module-level const to
+// evaluate before loadEnvConfig(), making env vars undefined.
 
 export interface SqlResult {
   sql: string;
@@ -30,11 +30,14 @@ Rules:
 
   const userPrompt = `Question: ${userQuestion}`;
 
-  const response = await fetch(`${LM_STUDIO_BASE_URL}/chat/completions`, {
+  const baseUrl = process.env.LM_STUDIO_BASE_URL || 'http://localhost:1234/v1';
+  const model = process.env.LM_STUDIO_MODEL || 'qwen2.5-coder-7b-instruct';
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },

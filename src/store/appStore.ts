@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 import type { ChartConfig, DashboardWidget, ParsedCSV } from '@/types';
+import type { ForecastResult } from '@/lib/forecast';
 
-export type DashboardTab = 'board' | 'data';
+export type DashboardTab = 'board' | 'data' | 'notebook';
 
 // ── Private helper: ensure at least one empty slot exists ──
 function ensureEmptySlot(widgets: DashboardWidget[]): DashboardWidget[] {
@@ -84,6 +85,7 @@ export interface AppStoreState {
   addWidget: (widget: DashboardWidget) => void;
   removeWidget: (widgetId: string) => void;
   updateWidget: (widgetId: string, updates: Partial<DashboardWidget>) => void;
+  addForecastWidget: (result: ForecastResult) => void;
   setPendingChartSlotId: (id: string | null) => void;
 }
 
@@ -178,6 +180,18 @@ export const useAppStore = create<AppStoreState>()(
         })),
       setPendingChartSlotId: (pendingChartSlotId) =>
         set({ pendingChartSlotId }),
+      addForecastWidget: (result) =>
+        set((state) => ({
+          dashboardWidgets: ensureEmptySlot([
+            ...state.dashboardWidgets,
+            {
+              id: `forecast-${Date.now()}`,
+              widgetType: 'forecast',
+              forecastResult: result,
+              layout: { x: 0, y: Infinity, w: 6, h: 8 },
+            },
+          ]),
+        })),
     }),
     {
       name: 'csv-analyst-store',

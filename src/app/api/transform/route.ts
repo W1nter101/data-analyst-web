@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       const headers = newCols.map((c) => c.name);
       
       // Fetch all rows to compute stats (null counts, unique counts, min/max, samples)
-      const rows = newDb.prepare(`SELECT * FROM "data"`).all() as Record<string, any>[];
+      const rows = newDb.prepare(`SELECT * FROM "data"`).all() as Record<string, unknown>[];
       newDb.close();
 
       // Convert all row values to string to prevent "raw.trim is not a function" in schema.ts

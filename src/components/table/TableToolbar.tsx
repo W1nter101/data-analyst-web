@@ -42,7 +42,7 @@ export function TableToolbar() {
           const fileData = await fileRes.json();
           if (fileData.success) {
             useAppStore.getState().setCSV({
-              headers: fileData.file.schema.map((s: any) => s.name),
+              headers: fileData.file.schema.map((s: { name: string }) => s.name),
               rowCount: fileData.file.row_count,
               schema: fileData.file.schema,
               rows: [],

@@ -20,7 +20,7 @@ export function ComposerPreview({ chartConfig, data }: Props) {
   }
 
   return (
-    <div className="min-h-[400px] w-full">
+    <div className="min-h-[400px] w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
       <ChartRenderer chartConfig={chartConfig} data={data} />
     </div>
   );

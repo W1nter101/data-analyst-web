@@ -6,10 +6,16 @@
  * without requiring Next.js relative fetch bases.
  */
 
-const LM_STUDIO_BASE_URL =
-  process.env.LM_STUDIO_BASE_URL || 'http://localhost:1234/v1';
-const LM_STUDIO_MODEL =
-  process.env.LM_STUDIO_MODEL || 'sql-phi3';
+// IMPORTANT: Use getter functions instead of module-level constants.
+// ES import hoisting causes module-level const to evaluate BEFORE
+// loadEnvConfig() in chatWorker.ts, making env vars undefined.
+function getLMStudioBaseUrl(): string {
+  return process.env.LM_STUDIO_BASE_URL || 'http://localhost:1234/v1';
+}
+
+function getLMStudioModel(): string {
+  return process.env.LM_STUDIO_MODEL || 'qwen2.5-coder-7b-instruct';
+}
 
 export async function generateNarrative(
   title: string,
@@ -66,11 +72,11 @@ Loại: ${chartType}
 Top 5 giá trị: ${formattedTopValues}
 Tổng số dòng dữ liệu: ${rows.length}`;
 
-    const response = await fetch(`${LM_STUDIO_BASE_URL}/chat/completions`, {
+    const response = await fetch(`${getLMStudioBaseUrl()}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: LM_STUDIO_MODEL,
+        model: getLMStudioModel(),
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },

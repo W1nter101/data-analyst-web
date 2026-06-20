@@ -73,7 +73,7 @@ export function DashboardGrid() {
         w: mobile ? 1 : widget.layout.w,
         h: widget.layout.h,
         minW: 1,
-        minH: widget.widgetType === 'empty' ? 3 : 4,
+        minH: widget.widgetType === 'empty' ? 3 : widget.widgetType === 'forecast' ? 6 : 4,
         // Empty widgets are non-draggable and non-resizable
         isDraggable: widget.widgetType !== 'empty',
         isResizable: widget.widgetType !== 'empty',

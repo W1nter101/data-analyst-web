@@ -13,115 +13,23 @@ import { randomUUID } from 'crypto';
 import { generateNarrative } from '@/lib/narrativeHelper';
 
 // ── Config ────────────────────────────────────────────────────────────
+// IMPORTANT: Use getter functions instead of module-level constants.
+// ES import hoisting causes module-level const to evaluate BEFORE
+// loadEnvConfig() in chatWorker.ts, making env vars undefined.
+// Getters read process.env at call time, after env has been loaded.
 
-const LM_STUDIO_BASE_URL =
-  process.env.LM_STUDIO_BASE_URL || 'http://localhost:1234/v1';
-const LM_STUDIO_MODEL =
-  process.env.LM_STUDIO_MODEL || 'sql-phi3';
-
-const SYSTEM_PROMPT = `You are a data analysis AI. Given schema and user_query, return valid JSON only.
-
-Schema columns will be provided in the user message. Use EXACT column names from schema.
-
-## Intent: "transform"
-When user wants to add/rename/delete a column or fill empty values:
-{
-  "intent": "transform",
-  "transform_config": {
-    "operation": "add_column | rename_column | delete_column | fill_empty",
-    "column_name": "<target column name (new or existing)>",
-    "expression": "<SQL expression for add_column, or fill value for fill_empty>",
-    "new_name": "<only for rename_column>",
-    "data_type": "REAL | TEXT | INTEGER",
-    "description": "<Vietnamese human-readable explanation for user>"
-  }
+function getLMStudioBaseUrl(): string {
+  return process.env.LM_STUDIO_BASE_URL || 'http://localhost:1234/v1';
 }
 
-Operation rules:
-- "thêm cột" / "tính thêm" / "add column" → operation: "add_column"
-- "đổi tên" / "rename" → operation: "rename_column"
-- "xóa cột" / "delete column" / "bỏ cột" → operation: "delete_column"
-- "điền" / "fill" / "thay thế null" → operation: "fill_empty"
-
-IMPORTANT: Use EXACT column names from available_columns in expression field.
-
-## Intent: "visualize"
-When user asks for a chart/graph:
-{
-  "intent": "visualize",
-  "chart_config": {
-    "type": "Bar | Line | Pie | Scatter | Area",
-    "x_axis": "<exact column name from schema>",
-    "y_axis": "<exact column name from schema>",
-    "title": "<short descriptive title>",
-    "aggregation": { "function": "sum | avg | count | min | max", "group_by": "<column>" },
-    "filters": [{ "column": "<col>", "operator": "eq | in | gt | lt", "value": "<val>" }],
-    "color_by": "<column or null>",
-    "sort": "asc | desc | none"
-  }
+function getLMStudioModel(): string {
+  return process.env.LM_STUDIO_MODEL || 'qwen2.5-coder-7b-instruct';
 }
 
-Sort field rules:
-- "xếp từ cao xuống thấp" / "lớn nhất trước" / "giảm dần" / "descending" → sort: "desc"
-- "xếp từ thấp lên cao" / "nhỏ nhất trước" / "tăng dần" / "ascending" → sort: "asc"
-- No sort mentioned → sort: "none"
-
-## Intent: "analyze"
-When user asks a question requiring calculation (ranking, comparison, summary, trend):
-{
-  "intent": "analyze",
-  "analysis_config": {
-    "operation": "rank | compare | summary | trend",
-    "metric": "<EXACT column name from schema>",
-    "group_by": "<EXACT column name from schema>",
-    "aggregation": "sum | avg | count | min | max",
-    "limit": <number or null>,
-    "filters": [{ "column": "<col>", "operator": "in | eq | gt | lt", "value": "<val>" }]
-  }
-}
-
-Operation rules:
-- rank: top/bottom N → set limit = N, no filters needed
-- compare: specific groups → set filters with those group values
-- summary: totals across all data → no filters, no limit
-- trend: over time → group_by = date/time column
-
-## Intent: "key_influencers"
-When user wants to know which columns/factors INFLUENCE or CORRELATE WITH a specific column.
-This is about statistical correlation (Pearson/Spearman), NOT about aggregation or GROUP BY.
-
-DISTINGUISH FROM "analyze":
-- "analyze" → aggregation, GROUP BY, TOP N values, SUM/AVG/COUNT
-- "key_influencers" → correlation between columns, what drives/affects a metric
-
-Trigger keywords (Vietnamese + English):
-  "yếu tố nào ảnh hưởng", "cột nào tác động", "nguyên nhân của",
-  "ảnh hưởng đến", "tác động đến", "quan trọng nhất đến",
-  "yếu tố nào quyết định", "cái gì ảnh hưởng", "điều gì tác động",
-  "key influencers", "key factors", "what drives", "what affects",
-  "what influences", "what impacts", "correlation with",
-  "factors affecting", "drivers of"
-
-Output JSON:
-{
-  "intent": "key_influencers",
-  "targetColumn": "<exact column name from available_columns>"
-}
-
-Examples:
-- "yếu tố nào ảnh hưởng đến Profit?" → { "intent": "key_influencers", "targetColumn": "Profit" }
-- "cột nào tác động đến Units Sold?" → { "intent": "key_influencers", "targetColumn": "Units Sold" }
-- "what drives Revenue?" → { "intent": "key_influencers", "targetColumn": "Revenue" }
-- "doanh thu trung bình theo quốc gia?" → { "intent": "analyze" } ← aggregation, NOT correlation
-- "top 5 sản phẩm bán chạy nhất?" → { "intent": "analyze" } ← ranking, NOT correlation
-IMPORTANT: targetColumn must be an exact column name from the available_columns.
-IMPORTANT: When user asks "yếu tố nào ảnh hưởng đến X", ALWAYS use key_influencers, NEVER analyze.
-
-## Intent: "unknown"
-When query is not about data:
-{ "intent": "unknown", "message": "Tôi chỉ có thể giúp phân tích dữ liệu CSV." }
-
-Return JSON only. No explanation, no markdown.`;
+// NOTE: The old monolithic SYSTEM_PROMPT has been replaced by the 2-step pipeline:
+// - callGeminiPlanner() builds its own prompt
+// - callLocalJsonGenerator() uses LOCAL_JSON_SYSTEM
+// - callGeminiDirectJson() builds its own prompt
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -149,72 +57,508 @@ function extractJson(rawContent: string): unknown {
   return null;
 }
 
-async function callLMStudio(
+// ── Pipeline Step 1: Gemini Planner ──────────────────────────────────
+// Receives full schema + user query → outputs a short instruction (~20 words)
+// for the local model to generate structured JSON from.
+async function callGeminiPlanner(
+  schemaColumns: string,
+  userQuery: string,
+  columnList: string[],
+): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error('[GeminiPlanner] GEMINI_API_KEY not set');
+    return '';
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`;
+
+  const prompt = `You are a data analysis planner. Given the CSV schema and user request, determine the intent and output ONE short instruction for another model to generate a JSON config.
+
+Available columns: ${columnList.join(', ')}
+User request: "${userQuery}"
+
+Rules:
+- If user wants a chart/graph → output: "VISUALIZE: <chart_type> chart. X=<column>, Y=<aggregation>(<column>)[, color=<column>][, sort=<asc|desc|none>]"
+- If user wants data analysis (ranking, comparison, summary, trend) → output: "ANALYZE: <operation>. metric=<column>, group_by=<column>, aggregation=<function>[, limit=<N>][, filters=<col>:<op>:<val>]"
+- If user wants to transform data (add/rename/delete column, fill empty) → output: "TRANSFORM: <operation>. column=<name>[, expression=<expr>][, new_name=<name>][, data_type=<type>]"
+- If user wants key influencers/correlation → output: "KEY_INFLUENCERS: targetColumn=<column>"
+- If not data-related → output: "UNKNOWN"
+
+Use ONLY exact column names from the available columns list.
+Output the instruction only. No explanation. No markdown.`;
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 100, temperature: 0.1 },
+      }),
+    });
+
+    if (!res.ok) {
+      console.error(`[GeminiPlanner] HTTP ${res.status}: ${await res.text()}`);
+      return '';
+    }
+
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+    console.log('[GeminiPlanner] instruction:', text);
+    return text;
+  } catch (err) {
+    console.error('[GeminiPlanner] fetch error:', err);
+    return '';
+  }
+}
+
+// ── Pipeline Step 2: Local Model JSON Generator ─────────────────────
+// Receives a short instruction → generates structured JSON config.
+async function callLocalJsonGenerator(
+  instruction: string,
+): Promise<Record<string, unknown> | null> {
+  const LOCAL_JSON_SYSTEM = `You are a JSON generator. Given a short instruction, return ONLY a valid JSON object.
+
+If instruction starts with "VISUALIZE:":
+{"intent":"visualize","chart_config":{"type":"Bar|Line|Pie|Scatter|Area","x_axis":"<col>","y_axis":"<col>","title":"<title>","aggregation":{"function":"sum|avg|count|min|max","group_by":"<col>"},"filters":[],"color_by":null,"sort":"none"}}
+
+If instruction starts with "ANALYZE:":
+{"intent":"analyze","analysis_config":{"operation":"rank|compare|summary|trend","metric":"<col>","group_by":"<col>","aggregation":"sum|avg|count|min|max","limit":null,"filters":[]}}
+
+If instruction starts with "TRANSFORM:":
+{"intent":"transform","transform_config":{"operation":"add_column|rename_column|delete_column|fill_empty","column_name":"<col>","expression":"<expr>","new_name":"<name>","data_type":"REAL|TEXT|INTEGER","description":"<desc>"}}
+
+If instruction starts with "KEY_INFLUENCERS:":
+{"intent":"key_influencers","targetColumn":"<col>"}
+
+If instruction starts with "UNKNOWN":
+{"intent":"unknown","message":"Tôi chỉ có thể giúp phân tích dữ liệu CSV."}
+
+Return JSON only. No explanation. No markdown.`;
+
+  try {
+    const res = await fetch(`${getLMStudioBaseUrl()}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: getLMStudioModel(),
+        messages: [
+          { role: 'system', content: LOCAL_JSON_SYSTEM },
+          { role: 'user', content: instruction },
+        ],
+        max_tokens: 300,
+        temperature: 0.1,
+        stream: false,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "chart_config",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                type: { type: "string", enum: ["bar", "line", "pie", "area"] },
+                x: { type: "string" },
+                y: { type: "string" },
+                aggregation: { type: "string", enum: ["sum", "count", "avg", "max", "min"] },
+                color_by: { type: ["string", "null"] }
+              },
+              required: ["type", "x", "y", "aggregation"],
+              additionalProperties: false
+            }
+          }
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      console.error(`[LocalJsonGen] HTTP ${res.status}: ${await res.text()}`);
+      return null;
+    }
+
+    const data = await res.json();
+    const rawContent: string = data?.choices?.[0]?.message?.content ?? '';
+    console.log('[LocalJsonGen] raw:', rawContent);
+
+    // Check for truncation
+    const finishReason = data?.choices?.[0]?.finish_reason;
+    if (finishReason === 'length') {
+      console.warn('[LocalJsonGen] Response truncated (finish_reason=length)');
+    }
+
+    const parsed = extractJson(rawContent);
+    if (!parsed) {
+      console.error('[LocalJsonGen] Failed to extract JSON:', rawContent);
+      return null;
+    }
+
+    const sanitized = sanitizeAIResponse(parsed as Record<string, unknown>);
+    console.log('[LocalJsonGen] sanitized:', sanitized);
+    return sanitized;
+  } catch (err) {
+    console.error('[LocalJsonGen] fetch error:', err);
+    return null;
+  }
+}
+
+// ── Fallback: Gemini Direct JSON ────────────────────────────────────
+// If local model fails, Gemini generates the full JSON config directly.
+async function callGeminiDirectJson(
+  instruction: string,
+  columnList: string[],
+): Promise<Record<string, unknown> | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error('[GeminiFallback] GEMINI_API_KEY not set');
+    return null;
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`;
+
+  const prompt = `Convert this instruction into a JSON config object.
+Available columns: ${columnList.join(', ')}
+Instruction: ${instruction}
+
+If instruction starts with "VISUALIZE:":
+{"intent":"visualize","chart_config":{"type":"Bar","x_axis":"<col>","y_axis":"<col>","title":"<title>","aggregation":{"function":"sum","group_by":"<col>"},"filters":[],"color_by":null,"sort":"none"}}
+
+If instruction starts with "ANALYZE:":
+{"intent":"analyze","analysis_config":{"operation":"rank","metric":"<col>","group_by":"<col>","aggregation":"sum","limit":null,"filters":[]}}
+
+If instruction starts with "TRANSFORM:":
+{"intent":"transform","transform_config":{"operation":"add_column","column_name":"<col>","expression":"<expr>","new_name":null,"data_type":"REAL","description":"<desc>"}}
+
+If instruction starts with "KEY_INFLUENCERS:":
+{"intent":"key_influencers","targetColumn":"<col>"}
+
+If instruction starts with "UNKNOWN":
+{"intent":"unknown","message":"Tôi chỉ có thể giúp phân tích dữ liệu CSV."}
+
+Return ONLY valid JSON. No explanation.`;
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          maxOutputTokens: 300,
+          temperature: 0.1,
+          responseMimeType: 'application/json',
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      console.error(`[GeminiFallback] HTTP ${res.status}: ${await res.text()}`);
+      return null;
+    }
+
+    const data = await res.json();
+    const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+    console.log('[GeminiFallback] raw:', rawContent);
+
+    const parsed = extractJson(rawContent);
+    if (!parsed) {
+      console.error('[GeminiFallback] Failed to extract JSON:', rawContent);
+      return null;
+    }
+
+    const sanitized = sanitizeAIResponse(parsed as Record<string, unknown>);
+    console.log('[GeminiFallback] sanitized:', sanitized);
+    return sanitized;
+  } catch (err) {
+    console.error('[GeminiFallback] fetch error:', err);
+    return null;
+  }
+}
+
+// ── Fallback: Call Local Model Directly (no Gemini) ─────────────────
+// Used when Gemini Planner is unavailable (invalid API key, network error).
+// Uses a compact system prompt (~400 tokens) that Qwen 7B can handle.
+async function callLocalDirect(
+  userQuery: string,
+  columnList: string[],
+): Promise<Record<string, unknown> | null> {
+  const COMPACT_SYSTEM = `You are a JSON generator for data analysis. Given a user query and column list, return ONLY valid JSON.
+
+Available columns: ${columnList.join(', ')}
+
+Rules - detect intent from user query:
+- Chart/graph request → {"intent":"visualize","chart_config":{"type":"Bar|Line|Pie|Scatter|Area","x_axis":"<col>","y_axis":"<col>","title":"<title>","aggregation":{"function":"sum|avg|count","group_by":"<col>"},"filters":[],"color_by":null,"sort":"none"}}
+- Data question (ranking/comparison/summary) → {"intent":"analyze","analysis_config":{"operation":"rank|compare|summary|trend","metric":"<col>","group_by":"<col>","aggregation":"sum|avg|count","limit":null,"filters":[]}}
+- Add/rename/delete column → {"intent":"transform","transform_config":{"operation":"add_column|rename_column|delete_column|fill_empty","column_name":"<col>","expression":"<expr>","new_name":null,"data_type":"REAL","description":"<desc>"}}
+- Column correlation/influence → {"intent":"key_influencers","targetColumn":"<col>"}
+- Not data-related → {"intent":"unknown","message":"Tôi chỉ có thể giúp phân tích dữ liệu CSV."}
+
+Use EXACT column names from available columns. Return JSON only.`;
+
+  try {
+    const res = await fetch(`${getLMStudioBaseUrl()}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: getLMStudioModel(),
+        messages: [
+          { role: 'system', content: COMPACT_SYSTEM },
+          { role: 'user', content: userQuery },
+        ],
+        max_tokens: 500,
+        temperature: 0.1,
+        stream: false,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "chart_config",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                type: { type: "string", enum: ["bar", "line", "pie", "area"] },
+                x: { type: "string" },
+                y: { type: "string" },
+                aggregation: { type: "string", enum: ["sum", "count", "avg", "max", "min"] },
+                color_by: { type: ["string", "null"] }
+              },
+              required: ["type", "x", "y", "aggregation"],
+              additionalProperties: false
+            }
+          }
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      console.error(`[LocalDirect] HTTP ${res.status}: ${await res.text()}`);
+      return null;
+    }
+
+    const data = await res.json();
+    const rawContent: string = data?.choices?.[0]?.message?.content ?? '';
+    console.log('[LocalDirect] raw:', rawContent);
+
+    const finishReason = data?.choices?.[0]?.finish_reason;
+    if (finishReason === 'length') {
+      console.warn('[LocalDirect] Response truncated (finish_reason=length)');
+    }
+
+    const parsed = extractJson(rawContent);
+    if (!parsed) {
+      console.error('[LocalDirect] Failed to extract JSON:', rawContent);
+      return null;
+    }
+
+    const sanitized = sanitizeAIResponse(parsed as Record<string, unknown>);
+    console.log('[LocalDirect] sanitized:', sanitized);
+    return sanitized;
+  } catch (err) {
+    console.error('[LocalDirect] fetch error:', err);
+    return null;
+  }
+}
+
+// ── Combined Pipeline: Planner → Generator → Fallback ───────────────
+async function callAIPipeline(
   schema: unknown,
   userQuery: string,
   columnList: string[],
 ): Promise<Record<string, unknown> | null> {
-  const userContent = JSON.stringify({
-    schema,
-    user_query: userQuery,
-    available_columns: columnList,
-    instruction: `Use ONLY column names from available_columns for x_axis, y_axis, filters.column, aggregation.group_by, color_by, and targetColumn.`,
-  });
+  // Step 1: Gemini plans the instruction
+  const schemaShort = columnList.join(', ');
+  const instruction = await callGeminiPlanner(schemaShort, userQuery, columnList);
 
-  const res = await fetch(`${LM_STUDIO_BASE_URL}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: LM_STUDIO_MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userContent },
-      ],
-      temperature: 0.1,
-      stream: false,
-      max_tokens: 200,
-      stop: ["\n\n##", "## Intent", "### Query", "### Instr"],
-    }),
-  });
+  if (instruction) {
+    // Step 2: Local model generates JSON from instruction
+    let result = await callLocalJsonGenerator(instruction);
 
-  if (!res.ok) {
-    console.error(`LM Studio returned ${res.status}: ${await res.text()}`);
-    return null;
+    if (result) {
+      console.log('[Pipeline] Local model succeeded');
+      return result;
+    }
+
+    // Step 3: Retry local model once
+    console.log('[Pipeline] Local model failed, retrying...');
+    result = await callLocalJsonGenerator(instruction);
+
+    if (result) {
+      console.log('[Pipeline] Local model succeeded on retry');
+      return result;
+    }
+
+    // Step 4: Fallback to Gemini direct JSON
+    console.log('[Pipeline] Local model failed twice, falling back to Gemini direct JSON');
+    result = await callGeminiDirectJson(instruction, columnList);
+
+    if (result) {
+      console.log('[Pipeline] Gemini fallback succeeded');
+      return result;
+    }
+  } else {
+    console.warn('[Pipeline] Gemini planner unavailable, falling back to local-only mode');
   }
 
-  const data = await res.json();
-  const rawContent: string = data?.choices?.[0]?.message?.content ?? '';
-  console.log("LM STUDIO RAW RESPONSE:", rawContent);
- 
-  const parsed = extractJson(rawContent);
-  console.log("LM STUDIO PARSED RESPONSE:", parsed);
-  if (!parsed) {
-    console.error('Failed to extract JSON from LM Studio response:', rawContent);
-    return null;
+  // Step 5: Final fallback — call local model directly with compact prompt
+  // This handles the case where Gemini API is down/invalid key
+  console.log('[Pipeline] Trying local model direct (compact prompt)...');
+  let result = await callLocalDirect(userQuery, columnList);
+
+  if (result) {
+    console.log('[Pipeline] Local direct succeeded');
+    return result;
   }
-  return parsed as Record<string, unknown>;
+
+  // One more retry for local direct
+  console.log('[Pipeline] Local direct failed, retrying...');
+  result = await callLocalDirect(userQuery, columnList);
+
+  if (result) {
+    console.log('[Pipeline] Local direct succeeded on retry');
+    return result;
+  }
+
+  console.error('[Pipeline] All attempts failed');
+  return null;
 }
 
-function isValidResponse(obj: Record<string, unknown>): boolean {
-  console.log("isValidResponse checking object:", JSON.stringify(obj, null, 2));
-  if (typeof obj.intent !== 'string') return false;
+function sanitizeValue(val: unknown, fallback: string): string {
+  if (typeof val !== 'string') return fallback;
+  if (val.includes('|')) {
+    const parts = val.split('|').map(p => p.trim());
+    return parts[0] || fallback;
+  }
+  return val;
+}
 
-  if (obj.intent === 'unknown') {
+export function sanitizeAIResponse(obj: Record<string, unknown>): Record<string, unknown> {
+  if (!obj || typeof obj !== 'object') return obj;
+
+  const validTypes = ['bar', 'line', 'pie', 'area', 'scatter'];
+
+  // Normalize flat format: { type, x, y, ... } to nested format
+  if (!obj.intent && typeof obj.type === 'string' && validTypes.includes(obj.type.toLowerCase())) {
+    obj.intent = 'visualize';
+    const aggVal = typeof obj.aggregation === 'string' ? obj.aggregation : 'sum';
+    obj.chart_config = {
+      type: obj.type,
+      x_axis: obj.x,
+      y_axis: obj.y,
+      aggregation: {
+        function: aggVal,
+        group_by: obj.x
+      },
+      color_by: obj.color_by || null,
+      filters: [],
+      sort: 'none'
+    };
+  }
+
+  if (typeof obj.intent === 'string' && obj.intent.includes('|')) {
+    obj.intent = sanitizeValue(obj.intent, 'unknown');
+  }
+
+  // 1. Sanitize visualize config
+  if (obj.intent === 'visualize' && obj.chart_config && typeof obj.chart_config === 'object') {
+    const cc = obj.chart_config as Record<string, unknown>;
+    
+    // Also normalize if nested chart_config has x/y instead of x_axis/y_axis
+    if (cc.x && !cc.x_axis) cc.x_axis = cc.x;
+    if (cc.y && !cc.y_axis) cc.y_axis = cc.y;
+
+    cc.type = sanitizeValue(cc.type, 'Bar');
+    
+    if (cc.aggregation && typeof cc.aggregation === 'object') {
+      const agg = cc.aggregation as Record<string, unknown>;
+      agg.function = sanitizeValue(agg.function, 'sum');
+    }
+    
+    const filters = cc.filters;
+    if (Array.isArray(filters)) {
+      filters.forEach((f) => {
+        if (f && typeof f === 'object') {
+          const filterObj = f as Record<string, unknown>;
+          filterObj.operator = sanitizeValue(filterObj.operator, 'eq');
+        }
+      });
+    }
+
+    if (cc.sort) {
+      cc.sort = sanitizeValue(cc.sort, 'none');
+    }
+  }
+
+  // 2. Sanitize analyze config
+  if (obj.intent === 'analyze' && obj.analysis_config && typeof obj.analysis_config === 'object') {
+    const ac = obj.analysis_config as Record<string, unknown>;
+    ac.operation = sanitizeValue(ac.operation, 'summary');
+    ac.aggregation = sanitizeValue(ac.aggregation, 'sum');
+    
+    const filters = ac.filters;
+    if (Array.isArray(filters)) {
+      filters.forEach((f) => {
+        if (f && typeof f === 'object') {
+          const filterObj = f as Record<string, unknown>;
+          filterObj.operator = sanitizeValue(filterObj.operator, 'eq');
+        }
+      });
+    }
+  }
+
+  // 3. Sanitize transform config
+  if (obj.intent === 'transform' && obj.transform_config && typeof obj.transform_config === 'object') {
+    const tc = obj.transform_config as Record<string, unknown>;
+    tc.operation = sanitizeValue(tc.operation, 'add_column');
+  }
+
+  return obj;
+}
+
+export function isValidResponse(obj: Record<string, unknown> | null | undefined): boolean {
+  console.log("isValidResponse checking object:", JSON.stringify(obj, null, 2));
+  if (!obj || typeof obj !== 'object') return false;
+
+  const validTypes = ['bar', 'line', 'pie', 'area', 'scatter'];
+
+  const typeVal = obj.type;
+  const xVal = obj.x;
+  const yVal = obj.y;
+
+  // Check if it is a flat response
+  const isFlatChart = typeof typeVal === 'string' && validTypes.includes(typeVal.toLowerCase());
+  if (isFlatChart) {
+    if (!xVal || typeof xVal !== 'string') return false;
+    if (!yVal || typeof yVal !== 'string') return false;
+    return true;
+  }
+
+  // Check for nested structure or other intents
+  const intentVal = obj.intent;
+  if (typeof intentVal !== 'string') return false;
+
+  if (intentVal === 'unknown') {
     return typeof obj.message === 'string';
   }
 
-  if (obj.intent === 'visualize') {
+  if (intentVal === 'visualize') {
     const cc = obj.chart_config;
     if (!cc || typeof cc !== 'object') return false;
     const config = cc as Record<string, unknown>;
-    return (
-      typeof config.type === 'string' &&
-      typeof config.x_axis === 'string' &&
-      typeof config.y_axis === 'string'
-    );
+    
+    // Support either type/x_axis/y_axis or type/x/y
+    const type = (config.type || typeVal) as string;
+    if (!type || !validTypes.includes(type.toLowerCase())) return false;
+
+    const x = (config.x_axis || config.x || xVal) as string;
+    if (!x || typeof x !== 'string') return false;
+
+    const y = (config.y_axis || config.y || yVal) as string;
+    if (!y || typeof y !== 'string') return false;
+
+    return true;
   }
 
-  if (obj.intent === 'analyze') {
+  if (intentVal === 'analyze') {
     const ac = obj.analysis_config;
     if (!ac || typeof ac !== 'object') return false;
     const config = ac as Record<string, unknown>;
@@ -224,7 +568,7 @@ function isValidResponse(obj: Record<string, unknown>): boolean {
     );
   }
 
-  if (obj.intent === 'transform') {
+  if (intentVal === 'transform') {
     const tc = obj.transform_config;
     if (!tc || typeof tc !== 'object') return false;
     const config = tc as Record<string, unknown>;
@@ -234,10 +578,9 @@ function isValidResponse(obj: Record<string, unknown>): boolean {
     );
   }
 
-  // Key Influencers — structure-only check;
-  // column existence is validated in the API route via PRAGMA table_info
-  if (obj.intent === 'key_influencers') {
-    return typeof obj.targetColumn === 'string' && obj.targetColumn.length > 0;
+  if (intentVal === 'key_influencers') {
+    const targetColumnVal = obj.targetColumn;
+    return typeof targetColumnVal === 'string' && targetColumnVal.length > 0;
   }
 
   return false;
@@ -440,12 +783,76 @@ export async function processChat(input: ChatJobInput): Promise<ChatJobResult> {
   }
   // ───────────────────────────────────────────────────────────────────
 
-  // ── Call LM Studio (with 1 retry) ───────────────────────────────
-  let result = await callLMStudio(schema, user_query, columnList);
-  if (!result) {
-    console.log('Retry: first attempt returned null, retrying...');
-    result = await callLMStudio(schema, user_query, columnList);
+  // ─── FORECAST REGEX BYPASS ──────────────────────────────────────
+  // Detects forecast/prediction intent without LLM call.
+  // Falls through to LLM if no date column is found in schema.
+  const FORECAST_REGEX =
+    /dự báo|dự đoán|forecast|xu hướng tương lai|tháng tới|quý tới|năm tới|tuần tới|sẽ như thế nào|predict|sẽ đạt bao nhiêu|sẽ là bao nhiêu/i;
+
+  if (FORECAST_REGEX.test(user_query)) {
+    const schemaArr = schema as Array<{ column_name: string; data_type: string }>;
+
+    if (Array.isArray(schemaArr)) {
+      // Find dateColumn: type 'date' or name matches date-related keywords
+      const dateCol = schemaArr.find(
+        (c) =>
+          c.data_type === 'date' ||
+          /date|ngày|tháng|time|period|month|year/i.test(c.column_name),
+      );
+
+      // Find valueColumn: numeric column mentioned in query, fallback first numeric
+      const numericCols = schemaArr.filter(
+        (c) =>
+          c.data_type === 'number' ||
+          c.data_type === 'REAL' ||
+          c.data_type === 'INTEGER',
+      );
+      const valueCol =
+        numericCols.find((c) =>
+          user_query.toLowerCase().includes(c.column_name.toLowerCase()),
+        ) ?? numericCols[0];
+
+      // Detect horizon from query
+      const horizonMatch =
+        user_query.match(/(\d+)\s*(tháng|month)/i) ||
+        user_query.match(/(\d+)\s*(năm|year)/i) ||
+        user_query.match(/(\d+)\s*(quý|quarter)/i) ||
+        user_query.match(/(\d+)\s*(tuần|week)/i);
+      let horizon = 3;
+      if (horizonMatch) {
+        const n = parseInt(horizonMatch[1]);
+        const unit = horizonMatch[2].toLowerCase();
+        horizon =
+          unit.includes('quý') || unit.includes('quarter') ? n * 3 : n;
+        horizon = Math.max(1, Math.min(12, horizon));
+      }
+
+      if (dateCol && valueCol) {
+        console.log(
+          `[FORECAST REGEX] Bypassed LLM → dateColumn: "${dateCol.column_name}", valueColumn: "${valueCol.column_name}", horizon: ${horizon}`,
+        );
+        if (conversationId) {
+          saveUserMessage(conversationId, user_query);
+          saveAssistantMessage(
+            conversationId,
+            `Dự báo: ${valueCol.column_name} theo ${dateCol.column_name}`,
+            'forecast',
+          );
+        }
+        return {
+          intent: 'forecast' as const,
+          dateColumn: dateCol.column_name,
+          valueColumn: valueCol.column_name,
+          horizon,
+        };
+      }
+      // If dateCol not found → fall through to LLM
+    }
   }
+  // ───────────────────────────────────────────────────────────────────
+
+  // ── Call AI Pipeline (Gemini Planner → Local JSON → Gemini Fallback)
+  const result = await callAIPipeline(schema, user_query, columnList);
 
   if (!result) {
     throw new Error('Không thể phân tích phản hồi từ AI. Hãy thử lại.');
@@ -484,7 +891,7 @@ export async function processChat(input: ChatJobInput): Promise<ChatJobResult> {
 
   // ── Transform intent ────────────────────────────────────────────
   if (result.intent === 'transform') {
-    const tc = result.transform_config as Record<string, any>;
+    const tc = result.transform_config as Record<string, unknown>;
     if (tc && !tc.description) {
       const op = tc.operation;
       const col = tc.column_name;
@@ -654,11 +1061,11 @@ export async function processChat(input: ChatJobInput): Promise<ChatJobResult> {
       const userPrompt = `User's original question: "${user_query}"\n\nQuery results:\n${markdownTable}\n\nWrite a concise professional insight based on the numbers above.`;
       const NARRATIVE_SYSTEM_PROMPT = `You are a data analyst assistant.\nYou will receive pre-calculated numbers from a trusted calculation engine.\nYour ONLY job: write ONE short, professional insight (2-3 sentences max)\nin the SAME language as the user's question.\nRules:\n- Do NOT recalculate anything.\n- Do NOT change or question the numbers.\n- Do NOT add disclaimers or explanations.\n- Just return the insight text. Nothing else.`;
 
-      const response = await fetch(`${LM_STUDIO_BASE_URL}/chat/completions`, {
+      const response = await fetch(`${getLMStudioBaseUrl()}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: LM_STUDIO_MODEL,
+          model: getLMStudioModel(),
           messages: [
             { role: 'system', content: NARRATIVE_SYSTEM_PROMPT },
             { role: 'user', content: userPrompt },

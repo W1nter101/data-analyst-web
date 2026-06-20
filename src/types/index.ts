@@ -47,7 +47,7 @@ export interface ChartConfig {
   sortOrder?: 'asc' | 'desc' | 'none';
 }
 
-export type WidgetType = 'chart' | 'text' | 'image' | 'table' | 'empty';
+export type WidgetType = 'chart' | 'text' | 'image' | 'table' | 'empty' | 'forecast';
 
 export interface DashboardWidget {
   id: string;
@@ -61,6 +61,7 @@ export interface DashboardWidget {
     cols: number;
     cells: string[][]; // 2D array of strings
   };
+  forecastResult?: import('@/lib/forecast').ForecastResult;
   layout: { x: number; y: number; w: number; h: number };
 }
 

@@ -195,7 +195,7 @@ export function ChartRenderer({ chartConfig, data }: ChartRendererProps) {
   };
 
   return (
-    <div className="flex h-full w-full flex-col rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
+    <div className="flex h-full w-full flex-col rounded-xl p-2">
       {note && (
         <div className="mb-2 text-center text-xs text-[var(--color-warning)]">
           {note}

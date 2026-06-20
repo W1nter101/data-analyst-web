@@ -8,6 +8,9 @@
  * using the shared chatProcessor module.
  */
 
+import { loadEnvConfig } from '@next/env';
+loadEnvConfig(process.cwd());
+
 import 'tsconfig-paths/register';
 import { Worker } from 'bullmq';
 import { redisConnection } from '@/lib/queue';

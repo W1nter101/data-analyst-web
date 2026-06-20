@@ -10,6 +10,7 @@
     "worker": "tsx --require tsconfig-paths/register src/workers/chatWorker.ts"
   },
   "dependencies": {
+    "@google/genai": "^2.8.0",
     "@hookform/resolvers": "^5.2.2",
     "@tanstack/react-table": "^8.21.3",
     "@types/papaparse": "^5.5.2",

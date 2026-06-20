@@ -14,6 +14,7 @@ import { useCSVData } from '@/hooks/useCSVData';
 import { useAppStore } from '@/store/appStore';
 import { useExportPDF } from '@/hooks/useExportPDF';
 import { toast } from 'sonner';
+import { NotebookPanel } from '@/components/notebook/NotebookPanel';
 
 export default function DashboardPage() {
   const { csv } = useCSVData();
@@ -131,9 +132,12 @@ export default function DashboardPage() {
             </div>
           </section>
         </div>
-      ) : (
+      ) : activeTab === 'data' ? (
         /* ── Data tab ─────────────────────────────────────── */
         <DataView />
+      ) : (
+        /* ── Notebook tab ─────────────────────────────────── */
+        <NotebookPanel />
       )}
     </div>
   );

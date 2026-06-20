@@ -33,17 +33,29 @@ export function useExportPDF() {
       });
 
       // Fix 2: Inline hóa border-color (dom-to-image không đọc CSS variables)
+      // Chỉ thực hiện trên những phần tử có border width thực tế để tránh lỗi viền trắng thừa trên text/svg
       const borderedEls = Array.from(
         element.querySelectorAll<HTMLElement>('*')
       );
       borderedEls.forEach((el) => {
         const computed = getComputedStyle(el);
-        const bc = computed.borderColor;
-        // Nếu browser đã resolve CSS var sang màu cụ thể thì lấy luôn,
-        // còn không thì dùng token mặc định của project
-        if (bc && bc !== 'rgba(0, 0, 0, 0)') {
-          el.dataset.origBorder = el.style.borderColor;
-          el.style.borderColor = bc; // inline computed value
+        const borderTop = parseFloat(computed.borderTopWidth) || 0;
+        const borderRight = parseFloat(computed.borderRightWidth) || 0;
+        const borderBottom = parseFloat(computed.borderBottomWidth) || 0;
+        const borderLeft = parseFloat(computed.borderLeftWidth) || 0;
+
+        const hasBorder =
+          (borderTop > 0 && computed.borderTopStyle !== 'none') ||
+          (borderRight > 0 && computed.borderRightStyle !== 'none') ||
+          (borderBottom > 0 && computed.borderBottomStyle !== 'none') ||
+          (borderLeft > 0 && computed.borderLeftStyle !== 'none');
+
+        if (hasBorder) {
+          const bc = computed.borderColor;
+          if (bc && bc !== 'rgba(0, 0, 0, 0)') {
+            el.dataset.origBorder = el.style.borderColor;
+            el.style.borderColor = bc; // inline computed value
+          }
         }
       });
 
